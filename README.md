@@ -2,8 +2,8 @@
 
 本仓库是 `docs/plan.md` 中 **VoxToken++：Budgeted Adaptive 3D Tokenization for Proof-Carrying CT Reporting** 的工程化落地骨架：先把**模块边界、数据结构、类/函数接口、产物契约**固定下来，再逐步填充训练/推理实现与实验矩阵。`docs/plan.md` 同时包含 proposal、实现方案（A）与实验方案（B）的最小不可分拆解。
 
-当前状态：**interfaces-only（M0）**  
-已提供可运行的 `smoke` 与 `unified_eval`（用于验证“产物结构/指标 schema/命令入口”一致），模型本体仍为占位实现（`NotImplementedError`）。
+当前状态：**M0→M1（最小推理闭环已打通）**  
+已提供可运行的 `smoke` / `unified_eval`（用于固定“产物结构/指标 schema/命令入口”），以及最小可运行的 `infer_refine`（fixed-grid tokenizer + rule-based generator + verifier gate）。训练仍为占位实现（仅落盘 outputs 契约，不做真实学习）。
 
 ---
 
@@ -25,12 +25,14 @@
 - **Verifier**：程序化检查 missing/inconsistency/overclaim/unsupported，并给出 score
 - **SplitPolicy**：在预算下决定 refine 哪些 token（learned > heuristic）
 
-### 1.3 关键结论（M0 Claims）
+### 1.3 阶段性 Claims（M0/M1）
 
-> 本仓库当前处于 interfaces-only（M0）。可审计的 claims 与证据映射以 `docs/plan.md` 顶部的 **M0 Claims & Evidence Map** 为准；对应可运行实验见 `docs/experiment.md`。
+> 可审计的 claims 与证据映射以 `docs/plan.md` 顶部的 **M0/M1 Claims & Evidence Map** 为准；对应可运行实验见 `docs/experiment.md`。
 
 - **CLAIM-M0-1**：baseline smoke 可运行，并生成符合 results contract 的 `run.json`/`summary.json`
 - **CLAIM-M0-2**：unified eval 可运行，并生成符合 results contract 的 `metrics.json`/`metrics.jsonl`
+- **CLAIM-M1-1**：`infer_refine` 可运行，生成非空 report 且每句都有 citation
+- **CLAIM-M1-2**：`unified_eval` 可读取 `infer_refine` 的 `tokens_used/verifier_score`
 
 （Proposal-level 的研究命题/假设仍在 `docs/plan.md` 的 long-horizon 部分，当前不作为 M0 收敛判据。）
 
@@ -63,6 +65,8 @@
    ├─ verify/                 # verifier + rules/scorer（占位）
    └─ eval/                   # metrics/counterfactuals/pareto（占位）
 ```
+
+入口/结构索引（entrypoints/产物/契约一览）：`docs/project_index.md`
 
 ---
 
@@ -143,11 +147,23 @@ python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artif
 - `artifacts/eval/metrics.json`
 - `artifacts/eval/metrics.jsonl`
 
+### 5.3 一条命令跑最小推理闭环（infer_refine）
+
+```bash
+python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16
+python -m voxtoken.runner.unified_eval --in artifacts/infer/run.json --out artifacts/infer_eval
+```
+
+输出产物：
+
+- `artifacts/infer/run.json`（含 `tokens_used/budget_B/verifier_score` + report/citations/plan/trace/issues）
+- `artifacts/infer_eval/metrics.jsonl`（读取并落盘 `tokens_used/verifier_score`）
+
 ---
 
 ## 6. 训练（Training）
 
-> 训练脚本目前为接口占位，用于固定 stage 切分与配置入口；后续会逐步实现。
+> 训练脚本当前为最小占位实现：会落盘 `config.json` / `metrics.jsonl` / `checkpoint.json` 到 `outputs/`，用于固定 stage 切分与产物路径；后续再替换为真实训练。
 
 ### 6.1 单卡启动（占位）
 

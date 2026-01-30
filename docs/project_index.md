@@ -40,10 +40,10 @@
 |---|---|---|---|
 | Baseline smoke（产物契约） | `voxtoken/runner/smoke.py` | `python -m voxtoken.runner.smoke --out artifacts/smoke` | `artifacts/smoke/run.json`, `artifacts/smoke/summary.json` |
 | Unified eval（指标契约） | `voxtoken/runner/unified_eval.py` | `python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artifacts/eval` | `artifacts/eval/metrics.json`, `artifacts/eval/metrics.jsonl` |
-| Train tokenizer（占位） | `voxtoken/runner/train_tokenizer.py` | `python -m voxtoken.runner.train_tokenizer --config voxtoken/configs/train_tokenizer.yaml` | （未来：checkpoints/metrics/logs） |
-| Train evidence（占位） | `voxtoken/runner/train_evidence.py` | `python -m voxtoken.runner.train_evidence --config voxtoken/configs/train_evidence.yaml` | （未来：checkpoints/metrics/logs） |
-| Train policy（占位） | `voxtoken/runner/train_policy.py` | `python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy.yaml` | （未来：checkpoints/metrics/logs） |
-| Inference refine（占位） | `voxtoken/runner/infer_refine.py` | `python -m voxtoken.runner.infer_refine --config voxtoken/configs/inference.yaml` | （未来：run.json/trace/metrics） |
+| Train tokenizer（M1 stub） | `voxtoken/runner/train_tokenizer.py` | `python -m voxtoken.runner.train_tokenizer --config voxtoken/configs/train_tokenizer.yaml` | `outputs/train_tokenizer/<run_id>/{config,metrics,checkpoint}.json*` |
+| Train evidence（M1 stub） | `voxtoken/runner/train_evidence.py` | `python -m voxtoken.runner.train_evidence --config voxtoken/configs/train_evidence.yaml` | `outputs/train_evidence/<run_id>/{config,metrics,checkpoint}.json*` |
+| Train policy（M1 stub） | `voxtoken/runner/train_policy.py` | `python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy.yaml` | `outputs/train_policy/<run_id>/{config,metrics,checkpoint}.json*` |
+| Inference refine（M1 baseline） | `voxtoken/runner/infer_refine.py` | `python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16 --config voxtoken/configs/inference.yaml` | `artifacts/infer/run.json`, `artifacts/infer/summary.json` |
 
 ---
 
@@ -77,4 +77,3 @@
 
 3) **产物在哪/长什么样？**  
    见 `docs/results_contract.md`（契约）与 `docs/experiment.md`（实验矩阵与状态）。
-

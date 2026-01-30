@@ -15,10 +15,14 @@ class SplitPolicy(Module):
 
     def score(self, feats: List[TokenFeatures]) -> List[Tuple[int, float]]:
         """Returns (token_id, score)."""
-        raise NotImplementedError
+        scored: List[Tuple[int, float]] = []
+        for f in feats:
+            s = float(f.recon_error) + float(f.evidence_entropy) + float(f.citation_pressure) - float(f.history_splits)
+            scored.append((int(f.token_id), s))
+        scored.sort(key=lambda x: (-float(x[1]), int(x[0])))
+        return scored
 
 
 __all__ = [
     "SplitPolicy",
 ]
-

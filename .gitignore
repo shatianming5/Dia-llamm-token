@@ -9,7 +9,8 @@ env/
 artifacts/
 outputs/
 checkpoints/
+runs/
+data/
 
 .DS_Store
 Thumbs.db
-

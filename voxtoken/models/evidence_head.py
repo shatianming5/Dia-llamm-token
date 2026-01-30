@@ -22,10 +22,24 @@ class EvidenceHead(Module):
         Returns:
             Evidence nodes with structured attrs & supported_token_ids.
         """
-        raise NotImplementedError
+        nodes: List[EvidenceNode] = []
+        for t in tokens:
+            nodes.append(
+                EvidenceNode(
+                    eid=f"tok-{t.token_id}",
+                    finding_type=str(self.cfg.get("default_finding_type", "token")),
+                    attrs={
+                        "side": "U",
+                        "location": "U",
+                        "size_bin": "U",
+                        "certainty": "U",
+                    },
+                    supported_token_ids=[int(t.token_id)],
+                )
+            )
+        return nodes
 
 
 __all__ = [
     "EvidenceHead",
 ]
-

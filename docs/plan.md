@@ -11,6 +11,13 @@
 | CLAIM-M0-1 | baseline smoke 可运行，并生成符合 results contract 的 `run.json`/`summary.json` | `docs/experiment.md` → EXP-0000；产物：`artifacts/smoke/` | `python -m voxtoken.runner.smoke --out artifacts/smoke` | PROVED |
 | CLAIM-M0-2 | unified eval 可运行，并生成符合 results contract 的 `metrics.json`/`metrics.jsonl` | `docs/experiment.md` → EXP-0001；产物：`artifacts/eval/` | `python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artifacts/eval` | PROVED |
 
+## M1 Claims & Evidence Map（最小可运行推理闭环）
+
+| Claim ID | Claim（可验证陈述） | Evidence（在哪看） | Verify（命令） | Status |
+|---|---|---|---|---|
+| CLAIM-M1-1 | `infer_refine` 可运行，生成非空 report 且每句都有 citation | `docs/experiment.md` → EXP-0100；产物：`artifacts/infer/run.json` | `python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16` | PROVED |
+| CLAIM-M1-2 | `unified_eval` 可读取 `infer_refine` 的 `tokens_used/verifier_score` 并写入 `metrics.json(l)` | 产物：`artifacts/infer_eval/metrics.jsonl` | `python -m voxtoken.runner.unified_eval --in artifacts/infer/run.json --out artifacts/infer_eval` | PROVED |
+
 ## M0 Contracts（契约/协议）
 
 - Results contract：`docs/results_contract.md`
@@ -21,6 +28,7 @@
 ## Change Log（before/after + rationale）
 
 - 2026-01-30：新增 M0 Claims & Evidence Map；补齐 `docs/project_index.md`；将 `docs/experiment.md` 从占位表修复为可审计矩阵；同步 README（对齐 claims/矩阵/入口命令）。
+- 2026-01-30：补齐 M1 最小推理闭环（`infer_refine`）并将其纳入 claims/evidence；统一评测读取 `tokens_used/verifier_score`。
 
 ---
 

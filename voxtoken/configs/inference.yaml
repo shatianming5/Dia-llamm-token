@@ -1,5 +1,15 @@
 inference:
   budget_B: 1024
-refine:
-  max_rounds: 3
 
+# Minimal demo volume (no dataset yet)
+volume:
+  shape_cdhw: [1, 8, 8, 8]
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 4
+
+refine:
+  max_rounds: 0
+  max_splits_per_round: 0

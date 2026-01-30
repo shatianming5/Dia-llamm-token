@@ -4,7 +4,7 @@
 
 收敛条件：当 **Gap** 与 **Ambiguity** 两部分都为空时，进入实验定义与运行阶段（`docs/experiment.md`）。
 
-注意：当前仓库处于 **M0（interfaces-only）**，本清单只追踪 `docs/plan.md` 顶部 **M0 Claims & Evidence Map** 对应的阻塞项；proposal-level 的长线设计不纳入本轮收敛。
+注意：本清单以 `docs/plan.md` 顶部的 **阶段化 Claims & Evidence Map** 为准：每提升一个里程碑（M0→M1→…），只追踪该阶段声明的可验证工程承诺；proposal-level 的长线设计不直接作为阻塞项。
 
 ---
 

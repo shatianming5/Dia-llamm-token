@@ -14,5 +14,4 @@ class Encoder3D(Module):
 
     def forward(self, volume: Tensor) -> Tensor:
         """Encode a (C, D, H, W) volume into latent features."""
-        raise NotImplementedError
-
+        return volume

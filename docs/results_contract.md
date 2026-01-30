@@ -16,6 +16,12 @@
 }
 ```
 
+允许的扩展字段（只增不删/不随意改名）：
+
+- `budget_B`：推理 token 预算
+- `tokens_used`：实际使用 token 数
+- `verifier_score`：最终 verifier 分数（与 `metrics.json(l)` 对齐）
+
 ## 2) `metrics.json` / `metrics.jsonl`（统一评测输出）
 
 由 `voxtoken.runner.unified_eval` 输出，建议字段：
@@ -31,4 +37,3 @@
   "verifier_score": 0.0
 }
 ```
-

@@ -32,14 +32,25 @@ def unified_eval(run_json: str, out_dir: str, *, case_id: str = "case-0000", bud
     citations = list(run.get("citations", []))
     unsupported_rate = _compute_unsupported_rate(report, citations)
 
+    trace = list(run.get("trace", []))
+    tokens_used = int(run.get("tokens_used", 0))
+    if trace:
+        last = trace[-1]
+        if isinstance(last, dict) and "budget_used" in last:
+            tokens_used = int(last.get("budget_used", tokens_used))
+        if budget_B == 0 and isinstance(last, dict) and "budget_total" in last:
+            budget_B = int(last.get("budget_total", budget_B))
+
+    verifier_score = float(run.get("verifier_score", 0.0))
+
     metrics: Dict[str, Any] = {
         "case_id": case_id,
         "budget_B": budget_B,
-        "tokens_used": 0,
+        "tokens_used": int(tokens_used),
         "latency_ms": {"total": 0.0},
         "slot_f1": 0.0,
         "unsupported_rate": float(unsupported_rate),
-        "verifier_score": 0.0,
+        "verifier_score": float(verifier_score),
     }
 
     out_path = Path(out_dir)
@@ -64,4 +75,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
