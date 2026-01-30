@@ -25,14 +25,14 @@
 - **Verifier**：程序化检查 missing/inconsistency/overclaim/unsupported，并给出 score
 - **SplitPolicy**：在预算下决定 refine 哪些 token（learned > heuristic）
 
-### 1.3 关键结论（CLAIM 占位）
+### 1.3 关键结论（M0 Claims）
 
-> 目前仅为工程占位，详细定义见 `docs/plan.md`；实验矩阵与证据链将落在 `docs/experiment.md`。
+> 本仓库当前处于 interfaces-only（M0）。可审计的 claims 与证据映射以 `docs/plan.md` 顶部的 **M0 Claims & Evidence Map** 为准；对应可运行实验见 `docs/experiment.md`。
 
-- **CLAIM-1**：同等正确性下更少 tokens/更低时延（Pareto 优势）
-- **CLAIM-2**：citation 具备因果性（counterfactual 证明 citation 非装饰）
-- **CLAIM-3**：unsupported claim 率机制性趋近 0（constrained + verifier gate）
-- **CLAIM-4**：learned split policy > heuristic split（同预算更高 verifier 分数）
+- **CLAIM-M0-1**：baseline smoke 可运行，并生成符合 results contract 的 `run.json`/`summary.json`
+- **CLAIM-M0-2**：unified eval 可运行，并生成符合 results contract 的 `metrics.json`/`metrics.jsonl`
+
+（Proposal-level 的研究命题/假设仍在 `docs/plan.md` 的 long-horizon 部分，当前不作为 M0 收敛判据。）
 
 ---
 
@@ -51,7 +51,8 @@
 │  ├─ plan.md
 │  ├─ mohu.md
 │  ├─ results_contract.md
-│  └─ eval_protocol.md
+│  ├─ eval_protocol.md
+│  └─ project_index.md
 └─ voxtoken/
    ├─ schemas.py              # 核心数据结构（Token/Evidence/Plan/Issue/Trace...）
    ├─ torch_compat.py         # torch 可选依赖的兼容层（无 try/except）

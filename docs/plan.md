@@ -1,3 +1,29 @@
+---
+
+# Repo Plan（M0）& Proposal（Long-horizon）
+
+本仓库当前阶段：**interfaces-only（M0）**。为了让 doc-driven 循环可终止、可审计，本文件在顶部新增 **M0 Claims & Evidence Map**：只有该小节中的 claims 会被视为“必须证明”的工程承诺；其余大段内容是 long-horizon proposal / 设计笔记（为后续研究与实现服务），**不作为当前收敛的阻塞项**。
+
+## M0 Claims & Evidence Map（收敛判据）
+
+| Claim ID | Claim（可验证陈述） | Evidence（在哪看） | Verify（命令） | Status |
+|---|---|---|---|---|
+| CLAIM-M0-1 | baseline smoke 可运行，并生成符合 results contract 的 `run.json`/`summary.json` | `docs/experiment.md` → EXP-0000；产物：`artifacts/smoke/` | `python -m voxtoken.runner.smoke --out artifacts/smoke` | PROVED |
+| CLAIM-M0-2 | unified eval 可运行，并生成符合 results contract 的 `metrics.json`/`metrics.jsonl` | `docs/experiment.md` → EXP-0001；产物：`artifacts/eval/` | `python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artifacts/eval` | PROVED |
+
+## M0 Contracts（契约/协议）
+
+- Results contract：`docs/results_contract.md`
+- Unified evaluation protocol：`docs/eval_protocol.md`
+- Experiment matrix（baseline-first）：`docs/experiment.md`
+- Project index（入口/结构）：`docs/project_index.md`
+
+## Change Log（before/after + rationale）
+
+- 2026-01-30：新增 M0 Claims & Evidence Map；补齐 `docs/project_index.md`；将 `docs/experiment.md` 从占位表修复为可审计矩阵；同步 README（对齐 claims/矩阵/入口命令）。
+
+---
+
 本文档给出一份**按 NeurIPS Oral 的“硬标准”反推设计**的完整 proposal（以 **3D tokenization** 为主线），目标是将 reviewer 常见质疑点——**novelty、heuristic、grounding 真实性、active 是否真的 active、指标是否硬、因果性是否成立**——转化为论文的“不可替代贡献”。
 
 本文档不对“中稿概率”作承诺，但结构将**按“面向 Oral 级投稿所需证据链”**组织：按该证据链实施，可显著降低因“像拼装系统”而被一票否决的风险。
