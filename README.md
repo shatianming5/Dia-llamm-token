@@ -1,6 +1,6 @@
 # Dia-llamm-token / VoxToken++（接口先行 Repo Skeleton）
 
-本仓库是 `plan.md` 中 **VoxToken++：Budgeted Adaptive 3D Tokenization for Proof-Carrying CT Reporting** 的工程化落地骨架：先把**模块边界、数据结构、类/函数接口、产物契约**固定下来，再逐步填充训练/推理实现与实验矩阵。`plan.md` 同时包含 proposal、实现方案（A）与实验方案（B）的最小不可分拆解。
+本仓库是 `docs/plan.md` 中 **VoxToken++：Budgeted Adaptive 3D Tokenization for Proof-Carrying CT Reporting** 的工程化落地骨架：先把**模块边界、数据结构、类/函数接口、产物契约**固定下来，再逐步填充训练/推理实现与实验矩阵。`docs/plan.md` 同时包含 proposal、实现方案（A）与实验方案（B）的最小不可分拆解。
 
 当前状态：**interfaces-only（M0）**  
 已提供可运行的 `smoke` 与 `unified_eval`（用于验证“产物结构/指标 schema/命令入口”一致），模型本体仍为占位实现（`NotImplementedError`）。
@@ -27,7 +27,7 @@
 
 ### 1.3 关键结论（CLAIM 占位）
 
-> 目前仅为工程占位，详细定义见 `plan.md`；实验矩阵与证据链将落在 `docs/experiment.md`。
+> 目前仅为工程占位，详细定义见 `docs/plan.md`；实验矩阵与证据链将落在 `docs/experiment.md`。
 
 - **CLAIM-1**：同等正确性下更少 tokens/更低时延（Pareto 优势）
 - **CLAIM-2**：citation 具备因果性（counterfactual 证明 citation 非装饰）
@@ -42,12 +42,14 @@
 
 ```text
 .
-├─ plan.md
+├─ plan.md                 # moved: see docs/plan.md
 ├─ README.md
 ├─ requirements.txt
 ├─ .gitignore
 ├─ docs/
 │  ├─ experiment.md
+│  ├─ plan.md
+│  ├─ mohu.md
 │  ├─ results_contract.md
 │  └─ eval_protocol.md
 └─ voxtoken/
