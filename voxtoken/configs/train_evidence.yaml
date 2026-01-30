@@ -1,0 +1,8 @@
+data:
+  dataset: ct_rate
+  root: /path/to/ct_rate
+model:
+  name: evidence_head
+train:
+  batch_size: 2
+

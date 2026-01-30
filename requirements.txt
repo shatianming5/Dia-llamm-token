@@ -1,0 +1,5 @@
+# Minimal dev/runtime deps for the repo skeleton.
+#
+# NOTE: Core interfaces in `voxtoken/` are stdlib-only (torch is optional).
+pyyaml>=6.0
+

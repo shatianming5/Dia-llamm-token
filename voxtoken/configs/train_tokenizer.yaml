@@ -1,0 +1,8 @@
+data:
+  dataset: ct_rate
+  root: /path/to/ct_rate
+model:
+  levels: [0, 1, 2]
+train:
+  objective: vq_mae
+

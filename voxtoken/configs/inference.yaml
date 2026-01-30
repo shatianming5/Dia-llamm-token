@@ -1,0 +1,5 @@
+inference:
+  budget_B: 1024
+refine:
+  max_rounds: 3
+

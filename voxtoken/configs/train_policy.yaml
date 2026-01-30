@@ -1,0 +1,7 @@
+data:
+  traces: /path/to/trace.jsonl
+model:
+  name: split_policy
+train:
+  objective: offline_bandit
+
