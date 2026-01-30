@@ -1,6 +1,6 @@
-{{下面给你一份**按 NeurIPS Oral 的“硬标准”反推设计**的完整 proposal（走 **3D tokenization** 视角），目标是把 reviewer 最会喷的点——**novelty、heuristic、grounding 真实性、active 是否真的 active、指标是否硬、因果性是否成立**——逐一变成论文的“不可替代贡献”。
+本文档给出一份**按 NeurIPS Oral 的“硬标准”反推设计**的完整 proposal（以 **3D tokenization** 为主线），目标是将 reviewer 常见质疑点——**novelty、heuristic、grounding 真实性、active 是否真的 active、指标是否硬、因果性是否成立**——转化为论文的“不可替代贡献”。
 
-我不会承诺“80%必中”（没人能保证），但这份 proposal 的结构是**按“冲 Oral 必须具备的证据链”来写的**：你只要照着做，至少不会因为“像拼装系统”而被一票否掉。
+本文档不对“中稿概率”作承诺，但结构将**按“面向 Oral 级投稿所需证据链”**组织：按该证据链实施，可显著降低因“像拼装系统”而被一票否决的风险。
 
 ---
 
@@ -76,11 +76,11 @@
 * Level-0：粗网格 tokens 覆盖全体积（低成本、全局上下文）
 * Level-1..L：仅对被选择 split 的节点生成更细 tokens（局部高信息密度）
 
-> **关键点**：你的方法不是“固定 grid tokens”，而是“层级 tokens + 可学习 split”。这就是 Oral 级 novelty 的落脚点。
+> **关键点**：本方法不是“固定 grid tokens”，而是“层级 tokens + 可学习 split”。这就是 Oral 级 novelty 的落脚点。
 
 ---
 
-## 3.3 Split 决策：显式目标函数 + 可学习策略（堵死“heuristic”攻击）
+## 3.3 Split 决策：显式目标函数 + 可学习策略（回应“heuristic”质疑）
 
 我们把“细化哪些 token”形式化为一个预算约束优化：
 
@@ -94,7 +94,7 @@
 
 其中 (\Delta \mathcal{V}) 来自 verifier 的分数提升（见 3.6），(\Delta|T|) 是 split 增加的 token 数。
 
-### 可训练 Split Policy（主线，冲 Oral 必备）
+### 可训练 Split Policy（主线，面向 Oral 级投稿必备）
 
 定义每个候选 token 的状态特征 (x_i)：
 
@@ -109,7 +109,7 @@
 \pi_\psi(\text{split}\mid x_i) \in [0,1]
 ]
 
-训练方式（避免“RL 不稳定”喷点）：
+训练方式（回应“RL 不稳定”的常见质疑）：
 
 * 先用启发式/teacher 产生 logged data（entropy/recon）
 * 再做 **contextual bandit / offline RL**：奖励 = verifier 分数提升 − λ token 成本
@@ -199,7 +199,7 @@ R = \Delta \mathcal{V} - \lambda \Delta|T|
 
 # 4. 理论/可解释性（Oral 常见加分点：哪怕弱也要有）
 
-你不需要做大理论，但至少给出一个**可写进 paper 的“合理性保证”**：
+不必做大理论，但至少给出一个**可写进 paper 的“合理性保证”**：
 
 1. **边际收益递减假设**：refinement 使得证据不确定性下降通常呈递减（coarse→fine），因此 (\Delta\mathcal{V}) 在 token 数上呈 diminishing returns（经验上可验证）。
 2. **Stop rule 的合理性**：当 (\Delta\mathcal{V} / \Delta|T| < \tau) 时停止，等价于在 correctness–cost Pareto 上选择膝点。
@@ -207,7 +207,7 @@ R = \Delta \mathcal{V} - \lambda \Delta|T|
 
 ---
 
-# 5. 实验设计（按 Oral 反推：你必须给出哪些图/表）
+# 5. 实验设计（按 Oral 反推：必须给出的图/表）
 
 ## 5.1 主指标（拒绝只卷 ROUGE）
 
@@ -226,14 +226,14 @@ R = \Delta \mathcal{V} - \lambda \Delta|T|
 * **Fixed-grid 3D tokens**（同 encoder、同生成器，只禁用 adaptive split）
 * **2D slice tokens**（uniform slice sampling / 2.5D）
 * **ROI crop pipeline**（经典 coarse-to-fine/region-guided）
-* **Heuristic split**（entropy / recon error）vs **learned split policy（你方法）**
+* **Heuristic split**（entropy / recon error）vs **learned split policy（本文方法）**
 * **No-citation**（去掉 constrained/citation）
 * **No-refine**（只做一次 tokenization）
-* **Citation=attention top-k**（弱基线）vs **你的证据图 constrained citation**（证明不是可视化）
+* **Citation=attention top-k**（弱基线）vs **证据图 constrained citation（本文方法）**（证明不是可视化）
 
-## 5.3 反事实/因果实验（Oral 必杀）
+## 5.3 反事实/因果实验（Oral 级关键）
 
-这是你冲 Oral 的“护城河”，必须写进 proposal：
+这是面向 Oral 级投稿的关键证据链，必须写进 proposal：
 
 * **Permutation test**：随机打乱 token 支持域 (\Omega_i)（保持 token embedding 不变）→ grounding 与 correctness 显著下降
 * **Citation swap**：交换 cited token ids（保持句子不变）→ verifier 立即报 unsupported
@@ -244,14 +244,14 @@ R = \Delta \mathcal{V} - \lambda \Delta|T|
 ## 5.4 关键可视化（Oral 需要的 3 张主图）
 
 * **Fig1**：VoxToken++ 框图（层级 tokens + refine loop + constrained generation）
-* **Fig2**：Pareto 曲线（你 dominate fixed-grid & ROI crop）
+* **Fig2**：Pareto 曲线（相对于 fixed-grid & ROI crop 形成优势/dominance）
 * **Fig3**：Grounding 可视化 + 反事实实验结果（强说服力）
 
 ---
 
-# 6. 数据与落地策略（保证你能做出“硬 grounding”）
+# 6. 数据与落地策略（保证可实现“硬 grounding”）
 
-你必须确保至少一部分数据具备 **region-level ground truth**，否则 Oral 很难。
+需要确保至少一部分数据具备 **region-level ground truth**，否则 Oral 很难。
 
 最小策略：
 
@@ -260,7 +260,7 @@ R = \Delta \mathcal{V} - \lambda \Delta|T|
 
 如果现成数据 grounding 不够：
 
-* 你可以做一个**小规模标注子集**（几十到几百例），只标 2–3 个高价值 finding（结节/积液/气胸），但要做到高质量。Oral 认可“少而硬”。
+* 可构建一个**小规模标注子集**（几十到几百例），只标 2–3 个高价值 finding（结节/积液/气胸），但要做到高质量。Oral 认可“少而硬”。
 
 ---
 
@@ -284,7 +284,7 @@ R = \Delta \mathcal{V} - \lambda \Delta|T|
 
 ---
 
-# 9. 你这篇“冲 Oral”的核心卖点（写在 Introduction 的最后一段）
+# 9. 核心卖点（面向 Oral 级投稿；可写在 Introduction 的最后一段）
 
 * 我们不是在做“更强的报告生成器”，而是在做**可解释、可验证、预算可控的 3D tokenization**。
 * 通过 **learned adaptive tokens**，我们实现 **同等正确性更低 token/时延** 或 **同等预算更高正确性** 的 Pareto 优势。
@@ -293,31 +293,33 @@ R = \Delta \mathcal{V} - \lambda \Delta|T|
 
 ---
 
-## 你接下来我建议你立刻做的两件事（决定能不能冲 Oral）
+## 下一步优先事项（两件；决定是否具备 Oral 级证据链）
 
 1. **把 split 决策写成一个可以实现的目标函数 + learned policy**（这是 novelty 的锚）
 2. **准备 grounding 子集 + 做 3 个反事实实验**（这是说服力的锚）
 
 ---
 
-如果你愿意，我可以在你下一条回复里直接给你：
+可选补充（非主线）：
 
 * **NeurIPS 论文大纲（逐段落写什么）**
 * **Algorithm 1/2 的伪代码（tokenize/refine/constrained decode/verifier）**
 * **主实验表格模板（每一列对应 reviewer 质疑点）**
-  你只要告诉我：你更倾向 **离散 VQ tokens 主线**，还是先用 **连续 tokens MVP** 但写成“可插拔 VQ”的版本。
-}最小不可分的完整的帮我构造实现方案和实验方案}{下面给你两套东西，**都按“最小不可分（atomic）”**来写： 
+
+实现版本选择：更倾向 **离散 VQ tokens 主线**，或先用 **连续 tokens MVP** 并写成“可插拔 VQ”的版本。
+
+下面给出两套内容，**都按“最小不可分（atomic）”**来写： 
 
 * **A. 实现方案（Implementation Plan）**：每个模块的**接口、落地实现、训练/推理闭环、产物**一次性写全。
 * **B. 实验方案（Experiment Plan）**：按 NeurIPS Oral 反推的**主指标、baseline、消融、反事实因果实验、图表清单**一次性写全。
 
-我会把“能跑通的最小 MVP”与“冲 Oral 必备增强”写成同一条链路，确保每一步都有**验收检查（acceptance check）**，不会出现“做了很多但无法证明”的情况。
+本文档将把“能跑通的最小 MVP”与“面向 Oral 级投稿的必备增强”写成同一条链路，确保每一步都有**验收检查（acceptance check）**，避免出现“做了很多但无法证明”的情况。
 
 ---
 
 # A. 实现方案（最小不可分，端到端闭环）
 
-## A0. 统一协议与产物（先钉死，不然后面全崩）
+## A0. 统一协议与产物（先固定，避免后续接口/评测不一致）
 
 ### A0.1 统一坐标与支持域
 
@@ -592,7 +594,7 @@ voxtoken/
 
 # B. 实验方案（最小不可分，Oral 反推）
 
-## B0. 你要证明的 4 个核心命题（每个对应一组实验）
+## B0. 需要证明的 4 个核心命题（每个对应一组实验）
 
 1. **Adaptive tokenization 的 Pareto 优势**：同等 correctness 更少 tokens/latency，或同等预算更高 correctness
 2. **token-citation 的因果性**：citation 不是 attention 装饰（反事实实验必须成立）
@@ -611,7 +613,7 @@ voxtoken/
 ### B1.2 切分
 
 * train/val/test：按 patient-level split
-* grounding 子集必须覆盖 test（否则只做训练不做评测会被喷）
+* grounding 子集必须覆盖 test（否则容易被质疑为“只做训练不做评测”）
 
 ---
 
@@ -634,7 +636,7 @@ voxtoken/
 ### B2.3 Unsupported claim rate（主）
 
 * `unsupported = 句子无 citation 或 citation 不支持其 slot`
-* 目标：你方法接近 0，baseline 明显更高
+* 目标：本文方法接近 0，baseline 明显更高
 
 ### B2.4 Efficiency（主）
 
@@ -655,10 +657,10 @@ voxtoken/
 2. **2D slice tokens / 2.5D**（uniform sampling）
 3. **ROI crop pipeline**（传统 coarse-to-fine，非 token）
 4. **Heuristic split**（entropy/recon）
-5. **Learned split policy（你方法）**
+5. **Learned split policy（本文方法）**
 6. **No-citation**（去掉 citation/constrained）
 7. **No-refine**（只用 level-0 或一次性 tokens）
-8. **Citation = attention top-k**（弱引用） vs **你的 evidence-graph constrained citation**（强引用）
+8. **Citation = attention top-k**（弱引用） vs **evidence-graph constrained citation（本文方法）**（强引用）
 
 ---
 
@@ -668,11 +670,11 @@ voxtoken/
 * A2：learned split vs heuristic split（证明非 heuristic）
 * A3：constrained vs unconstrained（证明 unsupported 机制性下降）
 * A4：mask-head on/off（证明 grounding 不是伪）
-* A5：path A（选择式）vs path B（按需式）（若你实现 B，这是 Oral 强加分）
+* A5：path A（选择式）vs path B（按需式）（若实现 B，这是 Oral 强加分）
 
 ---
 
-## B5. 反事实/因果实验（Oral 必杀，最小三条必须做）
+## B5. 反事实/因果实验（Oral 级关键；最小三条必须做）
 
 1. **Permutation test**：随机打乱 token 支持域 (\Omega_i)（保持 embedding 不变）
 
@@ -741,7 +743,7 @@ voxtoken/
 
 ---
 
-## 你现在可以直接开工的“第一周任务清单”（不问你要额外信息也能做）
+## 第一周任务清单（可直接开工，无需额外前置信息）
 
 1. 把 Schema + trace runner 写出来（A0/A7）
 2. 实现 fixed-grid tokens（先用连续 embedding 也行，但接口按离散 token 设计）
@@ -751,14 +753,13 @@ voxtoken/
 
 ---
 
-如果你愿意，我下一步可以把上面这套进一步“工程化到你能直接写代码”的程度：
+可选：将上述内容进一步工程化到可直接写代码的粒度：
 
-* 给你 **每个模块的函数签名**（Python typing）
-* 给你 **4 个 config 模板**（tokenizer/evidence/policy/infer）
-* 给你 **Table1/Table2/Fig2/Fig3 的具体列名与作图脚本接口**（确保结果格式不会在写论文时崩）。
-}
+* **每个模块的函数签名**（Python typing）
+* **4 个 config 模板**（tokenizer/evidence/policy/infer）
+* **Table1/Table2/Fig2/Fig3 的具体列名与作图脚本接口**（确保结果格式不会在写论文时崩）。
 
-下面给你一份**“最小不可分（atomic）可落地”**的完整方案：我会把你已经写的 A/B 进一步**工程化到“你能直接开 repo 开写代码/开跑实验”的粒度**——包含：
+下面给出一份**“最小不可分（atomic）可落地”**的完整方案：将 A/B 进一步**工程化到“可直接开 repo 写代码/跑实验”的粒度**——包含：
 
 * **模块边界与接口（Python typing 级别）**
 * **训练/推理闭环（Algorithm 1/2 可直接进论文）**
@@ -767,15 +768,15 @@ voxtoken/
 * **Table/Figure 的列名与作图输入约定**
 * **反事实实验的可执行实现方式**
 
-同时我会把**离散 VQ tokens 主线**作为论文版本（Oral 口味），并提供一个**连续 tokens 的 MVP 替身**（保持接口不变，方便你先跑通再替换成 VQ）。
+论文主线采用**离散 VQ tokens**（面向 Oral 级表述），同时提供一个**连续 tokens 的 MVP 替身**（保持接口不变，便于先跑通再替换为 VQ）。
 
 ---
 
-## 0. 两条铁律（不写清楚后面全会崩）
+## 0. 两条原则（不写清楚会导致后续接口/评测不一致）
 
 ### 0.1 “Token = 表示 + 3D 支持域 + 可追溯父子关系”
 
-无论你先用连续还是离散，**Token 数据结构必须固定**，并且每个 token 必须具备：
+无论先用连续还是离散，**Token 数据结构必须固定**，并且每个 token 必须具备：
 
 * `omega_box_mm = (x0,x1,y0,y1,z0,z1)`：在**原始物理坐标（mm）**的 3D box（不是 resample 后 index）
 * `level`、`parent_id`、`children_ids`：支持层级 split
@@ -790,28 +791,28 @@ voxtoken/
 2. `evidence_graph.json`（结构化 slots + token 支持）
 3. `trace.jsonl`（每轮 refine：split、预算、时延、verifier 前后）
 
-这是你后续做 Pareto、做反事实、做可视化的**唯一可信证据链**。
+这是后续做 Pareto、做反事实、做可视化的**唯一可信证据链**。
 
 ---
 
 ## 1. 数据选择（让 grounding 变硬，不靠嘴）
 
-你至少需要一个“报告生成主数据”+ 一个“硬 grounding 子集”。
+至少需要一个“报告生成主数据”+ 一个“硬 grounding 子集”。
 
 推荐组合（公开可复现、论文可引用）：
 
 * **CT-RATE**：大规模胸部 CT 体数据 + 放射科报告（用于 report learning / 自监督 tokenizer）([arXiv][1])
-* **RadGenome-Chest CT**：在 CT-RATE 基础上扩展的**region-guided**数据：提供大量**句子↔分割 mask**级别 grounding（用于你最关键的“硬 grounding”主评测）([Nature][2])
+* **RadGenome-Chest CT**：在 CT-RATE 基础上扩展的**region-guided**数据：提供大量**句子↔分割 mask**级别 grounding（用于最关键的“硬 grounding”主评测）([Nature][2])
 * （可选）**RAD-ChestCT**：大规模多异常/位置标签胸 CT（用于外部泛化或弱监督证据头）([Zenodo][3])
 * （可选）**LIDC-IDRI**：肺结节 CT 数据（可用来做结节 mask/box 级 sanity 或训练 mask-head）([癌症影像库][4])
 
-> 关键点：RadGenome 给你“**sentence→mask**”的硬评测抓手；你不需要一开始就拿到所有 lesion mask，也能先把“citation/因果”打穿。
+> 关键点：RadGenome 提供 “**sentence→mask**” 的硬评测抓手；无需一开始就拿到所有 lesion mask，也可以先把“citation/因果”部分做成硬结论。
 
 ---
 
 ## 2. 代码级实现方案（Atomic 模块 + 接口）
 
-下面给的是**你可以直接照着写**的模块边界与 typing（建议用 `dataclasses` + `pydantic` 管 json）。
+下面给出**可直接照着写**的模块边界与 typing（建议用 `dataclasses` + `pydantic` 管 json）。
 
 ### 2.1 核心数据结构（必须固定）
 
@@ -948,7 +949,7 @@ class EvidenceHead(torch.nn.Module):
   * `mask_head(omega crop) -> lesion mask`
   * `measurement`（diameter/extent/volume）
 
-> 你可以用 RadGenome 的句子↔mask 做“器官/区域 grounding”的硬评测，然后用少量 lesion 标注把 mask-head 做硬 sanity（两条线并行）。
+> 可用 RadGenome 的句子↔mask 做“器官/区域 grounding”的硬评测，再用少量 lesion 标注把 mask-head 做硬 sanity（两条线并行）。
 
 ---
 
@@ -1002,7 +1003,7 @@ class Realizer:
 
 ## 2.5 Constrained Decoding（把 unsupported 变成“结构性难发生”）
 
-即使你用 LLM，也要把约束写成**可执行 gate**：
+即使使用 LLM，也要把约束写成**可执行 gate**：
 
 * **关键词集合约束**：finding/side/location/size/certainty 只能来自 plan
 * **每句必须输出 citation**：没有 citation → verifier 判 unsupported（不可协商）
@@ -1035,7 +1036,7 @@ class Verifier:
 ]
 
 * **M0**：SlotF1 可以先用“对 reference report 的 slot 抽取”（silver），哪怕抽取器简单也行，但必须固定可复现。
-* **M2**：RadGenome 的 grounded sentence/region 可给你硬对齐的部分（location/organ 维度）([Nature][2])
+* **M2**：RadGenome 的 grounded sentence/region 可提供硬对齐的部分（location/organ 维度）([Nature][2])
 
 ---
 
@@ -1067,7 +1068,7 @@ class SplitPolicy(torch.nn.Module):
 * 训练一个 ( \hat{Q}(x)\approx \mathbb{E}[\Delta \mathcal{V}-\lambda\Delta|T| \mid x] )
 * 推理时选 top-m split（受 budget 约束）
 
-> 这样你能非常清楚地在论文里写：**learned policy > heuristic**，且训练稳定。
+> 这样可以非常清楚地在论文中陈述：**learned policy > heuristic**，且训练稳定。
 
 ---
 
@@ -1150,7 +1151,7 @@ class RefineRunner:
 
 ---
 
-# 4. 配置模板（4 份 YAML，你可以直接照抄改路径）
+# 4. 配置模板（4 份 YAML，可直接照抄改路径）
 
 ## 4.1 `configs/train_tokenizer.yaml`
 
@@ -1268,7 +1269,7 @@ output:
 
 ## 命题 H2：Citation 不是 attention 装饰（因果反事实必须成立）
 
-最小三件套（你 proposal 里那三条，必须可执行）：
+最小三件套（proposal 里那三条，必须可执行）：
 
 1. **Permutation((\Omega))**：打乱 token 的 `omega_box_mm`（embedding 不变）
    预期：grounding 与 correctness 显著下降（统计显著）。
@@ -1279,7 +1280,7 @@ output:
 3. **Mask-level sanity**（在 RadGenome 的 region mask 上做也行）：
    统计 refine 后新增 tokens 与目标 mask 的 overlap 分布显著上升（相对随机/heuristic）。
 
-RadGenome 之所以适合：它有**句子↔mask**规模化数据，能让你把上述反事实做成“硬结论”。([Nature][2])
+RadGenome 之所以适合：它有**句子↔mask**规模化数据，能把上述反事实做成“硬结论”。([Nature][2])
 
 ---
 
@@ -1289,14 +1290,14 @@ RadGenome 之所以适合：它有**句子↔mask**规模化数据，能让你�
 
 * No-citation（去掉 citation/约束）
 * Attention-topk citation（弱引用）
-* 你的：EvidenceGraph + constrained generation + verifier gate（强引用）
+* 本文方法：EvidenceGraph + constrained generation + verifier gate（强引用）
 
 **主指标**：
 
 * `Unsupported (%)`：句子无 citation 或 citation 不支持 slot
 * `Overclaim (%)`：证据不确定但用确定语气
 
-目标：你的方法接近 0，baseline 显著更高。
+目标：本文方法接近 0，baseline 显著更高。
 
 ---
 
@@ -1305,7 +1306,7 @@ RadGenome 之所以适合：它有**句子↔mask**规模化数据，能让你�
 对比：
 
 * heuristic split（entropy / recon error）
-* learned bandit policy（你的）
+* learned bandit policy（本文方法）
 * random split（下界）
 
 呈现方式：
@@ -1315,7 +1316,7 @@ RadGenome 之所以适合：它有**句子↔mask**规模化数据，能让你�
 
 ---
 
-# 6. 指标定义（你论文里要写得像“硬标准”，而不是 NLP 指标）
+# 6. 指标定义（论文里需要写得像“硬标准”，而不是 NLP 指标）
 
 ## 6.1 Clinical correctness（Slot-F1）
 
@@ -1336,7 +1337,7 @@ slot 维度建议固定为：
 * `Hit@τ`：是否存在 cited token 与 GT mask overlap > τ
 * `Mean IoU` 或 `Dice`（有 mask 时）
 
-RadGenome 给你“句子对应 region mask”的直接评测通道。([Nature][2])
+RadGenome 提供“句子对应 region mask”的直接评测通道。([Nature][2])
 
 ## 6.3 Unsupported / Overclaim（Verifier 输出）
 
@@ -1351,7 +1352,7 @@ RadGenome 给你“句子对应 region mask”的直接评测通道。([Nature][
 
 ---
 
-# 7. 表格与作图模板（你可以直接按列落 CSV）
+# 7. 表格与作图模板（可直接按列落 CSV）
 
 ## 7.1 Table 1（主表：对齐 reviewer 所有硬喷点）
 
@@ -1404,9 +1405,9 @@ RadGenome 给你“句子对应 region mask”的直接评测通道。([Nature][
 
 ---
 
-# 8. 反事实实验怎么“可执行”（你可以直接写进 eval/counterfactuals.py）
+# 8. 反事实实验怎么“可执行”（可直接写进 eval/counterfactuals.py）
 
-给你三个开关（跑出来就是论文结论）：
+提供三个开关（跑出来就是论文结论）：
 
 1. `permute_omega(tokens)`：对 tokens 的 `omega_box_mm` 做随机置换（保持 embedding 顺序不变）
 2. `swap_citations(report)`：在同一 report 内随机交换句子 citations
@@ -1447,12 +1448,12 @@ RadGenome 给你“句子对应 region mask”的直接评测通道。([Nature][
 
 ---
 
-## 10. 你现在就能照着写的“最小 repo 骨架”
+## 10. 可直接照着写的“最小 repo 骨架”
 
-（和你 draft 类似，但我把脚本接口固定成“产物驱动评测”）
+（与当前 draft 类似，但脚本接口固定为“产物驱动评测”）
 
 ```
-voxtokenpp/
+voxtoken/
   configs/
   data/
     adapters/ct_rate.py
@@ -1489,26 +1490,26 @@ voxtokenpp/
 
 ---
 
-## 最关键的实现取舍（我直接替你定，不问你额外问题）
+## 最关键的实现取舍（默认决策）
 
 1. **论文主线：离散 VQ/RVQ tokens（VoxToken++ 名字才站得住）**
-2. **工程启动：连续 tokens MVP 允许，但接口必须按离散 token 设计**（`code=None`，其余完全一致）
+2. **工程启动：允许连续 tokens MVP，但接口必须按离散 token 设计**（`code=None`，其余完全一致）
 3. **先用 Path A（选择式 split）拿 Pareto/反事实/learned policy 结果**，再决定是否上 Path B（按需编码）去拿更漂亮的 latency 叙事。
 
 ---
 
-如果你按这套做，你会得到一条非常“NeurIPS reviewer 友好”的证据链：
+按本方案实施，将形成一条非常“NeurIPS reviewer 友好”的证据链：
 
 * **tokenization 有 budget 的形式化定义**（不是 crop heuristics）
-* **active split 有 learned policy + reward（verifier）**（不是“我觉得这里重要”）
+* **active split 有 learned policy + reward（verifier）**（不是“主观认为这里重要”）
 * **grounding 有句子↔mask 的硬评测 + 反事实因果实验**（不是 attention 可视化）
 * **unsupported 被 constrained+verifier 机制性压低**（不是靠评测后验抓）
 
-你接下来最应该做的第一步不是训练大模型，而是：
-**先把 schemas + runner + verifier + 三件套产物固定**，跑 50 个样本把 trace/metrics 全打通——这一步一旦完成，你后面所有模块替换（VQ、更强 evidence、更强 policy）都不会“做了很多但无法证明”。
+下一步最优先的第一步不是训练大模型，而是：
+**先把 schemas + runner + verifier + 三件套产物固定**，跑 50 个样本把 trace/metrics 全打通——这一步一旦完成，后续模块替换（VQ、更强 evidence、更强 policy）都不会“做了很多但无法证明”。
 
-[1]: https://arxiv.org/abs/2403.17834?utm_source=chatgpt.com "[2403.17834] Developing Generalist Foundation Models ..."
+[1]: https://arxiv.org/abs/2403.17834 "[2403.17834] Developing Generalist Foundation Models ..."
 [2]: https://www.nature.com/articles/s41597-025-05922-9 "Development of a large-scale grounded vision language dataset for chest CT analysis | Scientific Data"
-[3]: https://zenodo.org/records/6406114?utm_source=chatgpt.com "RAD-ChestCT Dataset"
+[3]: https://zenodo.org/records/6406114 "RAD-ChestCT Dataset"
 [4]: https://www.cancerimagingarchive.net/collection/lidc-idri/?utm_source=chatgpt.com "LIDC-IDRI - The Cancer Imaging Archive (TCIA)"
-[5]: https://cvit.duke.edu/resource/rad-chestct-dataset/?utm_source=chatgpt.com "RAD-ChestCT Dataset - CVIT - Center for Virtual Imaging Trials"
+[5]: https://cvit.duke.edu/resource/rad-chestct-dataset/ "RAD-ChestCT Dataset - CVIT - Center for Virtual Imaging Trials"
