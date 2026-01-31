@@ -293,7 +293,22 @@ python -m voxtoken.runner.reproduce --exp E0000
 # 也兼容 legacy: EXP-0000 / 0000
 ```
 
-### 13.2 如何定位 runs/<exp>/<run>
+### 13.2 批量跑队列（Queue Runner）
+
+本仓库在 `.rd_queue/` 下提供了可复用的队列文件（例如 `queue_e0920_0927.json`）。你可以用内置 runner 一次性跑完，并把 stdout/stderr 与结果摘要落到 `.rd_queue/logs/`、`.rd_queue/results/`。
+
+```bash
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0920_0927.json
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_papertrack_nodules_smoke.json
+```
+
+只跑某些实验 / stage：
+
+```bash
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0920_0927.json --only-id E0926 --only-stage smoke
+```
+
+### 13.3 如何定位 runs/<exp>/<run>
 
 - 计划约定：`runs/<exp_id>/<run_id>/` 下包含 `config.yaml`、checkpoints、logs、metrics.jsonl、plots/
 
