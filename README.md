@@ -90,7 +90,7 @@ pip install -r requirements.txt
 
 ## 4. 数据准备（Data Preparation）
 
-> 目前数据脚本是占位接口：用于固定“数据放置路径约定/预处理入口”，具体实现将在后续补齐。
+> 数据 ingest/preprocess 已可运行（repo-skeleton 口径）：用于固定“数据入口/manifest/split 规则/产物路径契约”，不等价于论文级真实训练数据流程。
 
 ### 4.1 数据来源/格式（计划）
 
@@ -109,11 +109,12 @@ data/
     radgenome/
 ```
 
-### 4.3 预处理命令（占位）
+### 4.3 可运行的数据 ingest/preprocess（示例）
 
 ```bash
-python -m voxtoken.data.ingest --config voxtoken/configs/train_tokenizer.yaml
-python -m voxtoken.data.preprocess --config voxtoken/configs/train_tokenizer.yaml
+# 例：CT-RATE valid volumes（当前机器有 38 个可解析 .nii.gz），deterministic 70/30 train/val
+python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_valid_all_e0920.yaml
+python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_valid_all_split70_e0921.yaml
 ```
 
 ### 4.4 split 与 seed（对齐 plan）
@@ -172,6 +173,25 @@ python -m voxtoken.runner.train_tokenizer --config voxtoken/configs/train_tokeni
 python -m voxtoken.runner.train_evidence  --config voxtoken/configs/train_evidence.yaml
 python -m voxtoken.runner.train_policy    --config voxtoken/configs/train_policy.yaml
 ```
+
+### 6.4 CT-RATE pseudo-GT（effusions）训练闭环（repo-skeleton）
+
+本仓库提供一个“现有数据可跑通”的训练闭环：用 TotalSegmentator 的 effusion masks 作为 pseudo-GT，先在 train split 上拟合 policy，再在 val split 上跑 grounding benchmark（fixed/heuristic/learned 三种方法对照）。
+
+- 实验定义：见 `docs/experiment.md` 的 `E0920–E0927`
+- 一键复现（按顺序）：
+
+```bash
+for e in E0920 E0921 E0922 E0923 E0924 E0925 E0926 E0927; do
+  python -m voxtoken.runner.reproduce --exp "$e"
+done
+```
+
+输出示例：
+
+- train/val 划分后的 manifest：`artifacts/ct_rate_processed_valid_all_e0921/manifest.jsonl`
+- policy checkpoints：`outputs/train_policy/E0926/checkpoint.json`、`outputs/train_policy/E0927/checkpoint.json`
+- val benchmark summary：`artifacts/e0926_benchmark_pleural/summary.json`、`artifacts/e0927_benchmark_pericardial/summary.json`
 
 ### 6.2 多卡启动（占位）
 
@@ -266,10 +286,11 @@ python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artif
 
 ## 13. 复现实验（Reproduce）
 
-### 13.1 指定 EXP-ID 一键复现（占位）
+### 13.1 指定 E-ID 一键复现
 
 ```bash
-python -m voxtoken.runner.reproduce --exp EXP-0000
+python -m voxtoken.runner.reproduce --exp E0000
+# 也兼容 legacy: EXP-0000 / 0000
 ```
 
 ### 13.2 如何定位 runs/<exp>/<run>
