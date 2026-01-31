@@ -100,6 +100,8 @@ def _ingest_synthetic(cfg: Dict[str, Any]) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     num_cases = int(cfg.get("num_cases", 1))
+    if int(num_cases) <= 0:
+        num_cases = 1
     manifest_path = Path(str(cfg.get("manifest_path", out_dir / "manifest.jsonl")))
 
     lines: List[str] = []
@@ -141,6 +143,7 @@ def _ingest_ct_rate(cfg: Dict[str, Any]) -> None:
     num_cases = int(cfg.get("num_cases", 20))
     seed = int(cfg.get("seed", 0))
     manifest_path = Path(str(cfg.get("manifest_path", out_dir / "manifest.jsonl")))
+    cap_cases: int | None = None if int(num_cases) <= 0 else int(num_cases)
 
     report_fields = cfg.get("report_fields") or ["Findings_EN", "Impressions_EN"]
     if not isinstance(report_fields, list) or not report_fields:
@@ -180,7 +183,9 @@ def _ingest_ct_rate(cfg: Dict[str, Any]) -> None:
 
     # Create deterministic but stable ordering when multiple passes are needed: we can offset by seed.
     # For simplicity we just skip the first `seed % 997` matching rows to vary subsets deterministically.
-    skip = int(seed) % 997
+    #
+    # If cap_cases is None (no cap), do not apply a skip: take all.
+    skip = (int(seed) % 997) if cap_cases is not None else 0
     skipped = 0
 
     lines: List[str] = []
@@ -244,7 +249,7 @@ def _ingest_ct_rate(cfg: Dict[str, Any]) -> None:
             )
         )
         taken += 1
-        if taken >= num_cases:
+        if cap_cases is not None and taken >= int(cap_cases):
             break
 
     manifest_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")

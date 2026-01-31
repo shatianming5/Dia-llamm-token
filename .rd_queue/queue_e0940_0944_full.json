@@ -1,0 +1,37 @@
+[
+  {
+    "id": "E0940",
+    "stage": "full",
+    "name": "data: RadGenome-ChestCT ingest+preprocess (paper full)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_full_e0940.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_full_e0940.yaml && python -m voxtoken.runner.validate_manifest --in artifacts/radgenome_proc_e0940/manifest.jsonl --require-n-ge 200 --valid-splits train val test --require-report-path-exists --require-volume-path-exists --require-nonempty-volume-paths-ge 200 --require-case-id-prefix train_",
+    "workdir": "."
+  },
+  {
+    "id": "E0941",
+    "stage": "full",
+    "name": "data: build GT manifest from RadGenome anatomy masks (lung nodule) (paper full)",
+    "command": "python -m voxtoken.data.radgenome_mask_manifest --in artifacts/radgenome_proc_e0940/manifest.jsonl --out artifacts/radgenome_gt_lung_nodule_e0941 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --radgenome-root /data/tiasha/RadGenome-ChestCT --mask \"lung nodule\" --max-cases-train 400 --max-cases-val 100 --max-cases-test 0 && python -m voxtoken.runner.validate_ct_rate_ts_manifest --in artifacts/radgenome_gt_lung_nodule_e0941/manifest.jsonl --require-n-ge 100 --require-gt-is-pseudo --require-coord-system token_space_mm && python -m voxtoken.runner.validate_split_counts --in artifacts/radgenome_gt_lung_nodule_e0941/manifest.jsonl --require-train-ge 50 --require-val-ge 20",
+    "workdir": "."
+  },
+  {
+    "id": "E0942",
+    "stage": "full",
+    "name": "policy: build dataset + train torch policy (seed0/1/2) (paper full)",
+    "command": "python -m voxtoken.runner.build_policy_dataset_multi --manifest artifacts/radgenome_gt_lung_nodule_e0941/manifest.jsonl --out artifacts/radgenome_policy_dataset_lung_nodule_e0942/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 0 --split train && torchrun --standalone --nproc_per_node ${NPROC_PER_NODE:-1} -m voxtoken.runner.train_policy_torch --config voxtoken/configs/train_policy_radgenome_lung_nodule_torch_e0942_seed0.yaml && torchrun --standalone --nproc_per_node ${NPROC_PER_NODE:-1} -m voxtoken.runner.train_policy_torch --config voxtoken/configs/train_policy_radgenome_lung_nodule_torch_e0942_seed1.yaml && torchrun --standalone --nproc_per_node ${NPROC_PER_NODE:-1} -m voxtoken.runner.train_policy_torch --config voxtoken/configs/train_policy_radgenome_lung_nodule_torch_e0942_seed2.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0942_seed0/checkpoint.json --require-nondefault-weights && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0942_seed1/checkpoint.json --require-nondefault-weights && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0942_seed2/checkpoint.json --require-nondefault-weights",
+    "workdir": "."
+  },
+  {
+    "id": "E0943",
+    "stage": "full",
+    "name": "eval: benchmark (fixed/heuristic/learned/random/oracle) (seed0/1/2) (paper full)",
+    "command": "python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_e0941/manifest.jsonl --out artifacts/e0943_benchmark_radgenome_lung_nodule_seed0 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 0 --split val --seed 0 --policy-ckpt outputs/train_policy/E0942_seed0/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0943_benchmark_radgenome_lung_nodule_seed0/summary.json --require-methods fixed heuristic learned random oracle && python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_e0941/manifest.jsonl --out artifacts/e0943_benchmark_radgenome_lung_nodule_seed1 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 0 --split val --seed 1 --policy-ckpt outputs/train_policy/E0942_seed1/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0943_benchmark_radgenome_lung_nodule_seed1/summary.json --require-methods fixed heuristic learned random oracle && python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_e0941/manifest.jsonl --out artifacts/e0943_benchmark_radgenome_lung_nodule_seed2 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 0 --split val --seed 2 --policy-ckpt outputs/train_policy/E0942_seed2/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0943_benchmark_radgenome_lung_nodule_seed2/summary.json --require-methods fixed heuristic learned random oracle",
+    "workdir": "."
+  },
+  {
+    "id": "E0944",
+    "stage": "full",
+    "name": "paper: export CI tables/plots (multi-seed) (paper full)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0943_benchmark_radgenome_lung_nodule_seed0/metrics.jsonl --in artifacts/e0943_benchmark_radgenome_lung_nodule_seed1/metrics.jsonl --in artifacts/e0943_benchmark_radgenome_lung_nodule_seed2/metrics.jsonl --out artifacts/paper_e0944_radgenome_lung_nodule && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0944_radgenome_lung_nodule",
+    "workdir": "."
+  }
+]

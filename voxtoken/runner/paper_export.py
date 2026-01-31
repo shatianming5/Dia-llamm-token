@@ -30,6 +30,13 @@ def _load_jsonl(path: Path) -> List[Dict[str, Any]]:
     return rows
 
 
+def _load_jsonl_many(paths: List[Path]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for p in paths:
+        out.extend(_load_jsonl(Path(p)))
+    return out
+
+
 def _mean(vals: List[float]) -> float:
     return float(sum(vals) / float(len(vals))) if vals else 0.0
 
@@ -94,6 +101,68 @@ def _group_means(metrics_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "ground_hit@0.1_mean": _mean([float(x.get("ground_hit@0.1", 0.0)) for x in rs]),
                 "tokens_used_mean": _mean([float(x.get("tokens_used", 0.0)) for x in rs]),
                 "latency_ms.total_mean": _mean([float((x.get("latency_ms") or {}).get("total", 0.0)) for x in rs]),
+            }
+        )
+    return out
+
+
+def _aggregate_by_case(metrics_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    by_key: Dict[Tuple[str, str, int], List[Dict[str, Any]]] = {}
+    for r in metrics_rows:
+        case_id = str(r.get("case_id", "")).strip()
+        method = str(r.get("method", "")).strip()
+        budget = int(r.get("budget_B", 0) or 0)
+        if not case_id or not method or budget <= 0:
+            continue
+        by_key.setdefault((case_id, method, int(budget)), []).append(r)
+
+    out: List[Dict[str, Any]] = []
+    for (case_id, method, budget_B), rs in sorted(by_key.items(), key=lambda x: (x[0][1], int(x[0][2]), x[0][0])):
+        best = None
+        best_score = -1.0
+        for r in rs:
+            try:
+                s = float(r.get("ground_mean_iou", 0.0))
+            except Exception:
+                s = 0.0
+            if s > best_score and r.get("best_token_box_mm", None) is not None:
+                best_score = float(s)
+                best = r
+        if best is None:
+            best = rs[0]
+
+        def mean_key(k: str) -> float:
+            vals: List[float] = []
+            for r in rs:
+                try:
+                    vals.append(float(r.get(k, 0.0)))
+                except Exception:
+                    continue
+            return float(_mean(vals))
+
+        lat_vals: List[float] = []
+        for r in rs:
+            try:
+                lat_vals.append(float((r.get("latency_ms") or {}).get("total", 0.0)))
+            except Exception:
+                continue
+
+        seeds = sorted({int(r.get("seed", 0) or 0) for r in rs})
+
+        out.append(
+            {
+                "case_id": str(case_id),
+                "method": str(method),
+                "budget_B": int(budget_B),
+                "seed_n": int(len(seeds)),
+                "seeds": list(seeds),
+                "ground_mean_iou": float(mean_key("ground_mean_iou")),
+                "ground_hit@0.1": float(mean_key("ground_hit@0.1")),
+                "tokens_used": float(mean_key("tokens_used")),
+                "latency_ms": {"total": float(_mean(lat_vals))},
+                "gt_boxes_mm": best.get("gt_boxes_mm", []) or [],
+                "best_token_id": best.get("best_token_id", None),
+                "best_token_box_mm": best.get("best_token_box_mm", None),
             }
         )
     return out
@@ -275,7 +344,13 @@ def _plot_pareto(
     _draw_line(img, width=width, height=height, x0=pad_l, y0=height - pad_b, x1=width - pad_r, y1=height - pad_b, color=(0, 0, 0))
     _draw_line(img, width=width, height=height, x0=pad_l, y0=pad_t, x1=pad_l, y1=height - pad_b, color=(0, 0, 0))
 
-    colors = {"fixed": (31, 119, 180), "heuristic": (255, 127, 14), "learned": (44, 160, 44)}
+    colors = {
+        "fixed": (31, 119, 180),
+        "heuristic": (255, 127, 14),
+        "learned": (44, 160, 44),
+        "random": (148, 103, 189),
+        "oracle": (214, 39, 40),
+    }
 
     pareto_idx = set(pareto_front([(float(p.get(y_key, 0.0)), float(p.get(x_key, 0.0))) for p in points]))
     for i, p in enumerate(points):
@@ -349,8 +424,9 @@ def _write_overlay_svg(path: Path, *, title: str, cited: List[List[float]], gt: 
     path.write_text("\n".join(parts), encoding="utf-8")
 
 
-def paper_export(metrics_jsonl: Path, *, out_dir: Path) -> Dict[str, Any]:
-    rows = _load_jsonl(metrics_jsonl)
+def paper_export(metrics_jsonls: List[Path], *, out_dir: Path) -> Dict[str, Any]:
+    raw_rows = _load_jsonl_many(list(metrics_jsonls))
+    rows = _aggregate_by_case(raw_rows)
     groups = _group_means(rows)
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -482,23 +558,35 @@ def paper_export(metrics_jsonl: Path, *, out_dir: Path) -> Dict[str, Any]:
         gt_boxes = [b for b in gt if isinstance(b, list) and len(b) == 6]
         _write_overlay_svg(fig3_dir / f"learned_B{budget_B}_{case_id}.svg", title=title, cited=cited, gt=gt_boxes)
 
-    summary = {"timestamp_utc": _utc_now_iso(), "in_metrics_jsonl": str(metrics_jsonl), "out_dir": str(out_dir)}
+    summary: Dict[str, Any] = {
+        "timestamp_utc": _utc_now_iso(),
+        "in_metrics_jsonls": [str(Path(p)) for p in metrics_jsonls],
+        "n_inputs": int(len(metrics_jsonls)),
+        "n_rows_raw": int(len(raw_rows)),
+        "n_rows_agg": int(len(rows)),
+        "out_dir": str(out_dir),
+    }
+    if len(metrics_jsonls) == 1:
+        summary["in_metrics_jsonl"] = str(Path(metrics_jsonls[0]))
     (out_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return summary
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Paper export: tables/figures from benchmark metrics.jsonl (repo-skeleton).")
-    parser.add_argument("--in", dest="metrics_jsonl", required=True, help="Path to metrics.jsonl (from ct_rate_grounding_benchmark)")
+    parser.add_argument("--in", dest="metrics_jsonl", action="append", required=True, help="Path to metrics.jsonl (repeatable)")
     parser.add_argument("--out", required=True, help="Output directory (artifacts/paper_e0910)")
     args = parser.parse_args()
 
-    in_path = Path(args.metrics_jsonl)
-    if not in_path.exists():
-        print(f"[ERR] missing metrics.jsonl: {in_path}", file=sys.stderr)
-        sys.exit(2)
+    in_paths: List[Path] = []
+    for raw in args.metrics_jsonl or []:
+        p = Path(str(raw))
+        if not p.exists():
+            print(f"[ERR] missing metrics.jsonl: {p}", file=sys.stderr)
+            sys.exit(2)
+        in_paths.append(p)
     try:
-        summary = paper_export(in_path, out_dir=Path(args.out))
+        summary = paper_export(in_paths, out_dir=Path(args.out))
     except Exception as exc:  # noqa: BLE001
         print(f"[ERR] {exc}", file=sys.stderr)
         raise

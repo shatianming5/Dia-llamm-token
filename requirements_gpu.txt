@@ -1,0 +1,7 @@
+# Optional deps for GPU + paper-grade tracks.
+#
+# NOTE: Install an appropriate CUDA-enabled torch wheel for your system.
+torch>=2.0
+numpy>=1.24
+nibabel>=5.0
+

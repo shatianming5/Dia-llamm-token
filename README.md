@@ -84,6 +84,10 @@
 python -m venv .venv
 source .venv/bin/activate  # Windows PowerShell: .venv\\Scripts\\Activate.ps1
 pip install -r requirements.txt
+
+# Optional: GPU + paper-grade tracks (torch/numpy/nibabel).
+# Install a CUDA-enabled torch wheel appropriate for your system.
+pip install -r requirements_gpu.txt
 ```
 
 ---
@@ -140,6 +144,11 @@ python -m voxtoken.data.radgenome_mask_manifest \\
 
 # 例：一键跑 RadGenome lung nodule 端到端闭环（E0933–E0935）
 python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0933_0935.json --overwrite
+
+# 例：paper-grade RadGenome lung nodule track（E0940–E0944；multi-seed + random/oracle baselines；policy 用 torchrun/DDP）
+# 可通过 NPROC_PER_NODE 控制 torchrun 进程数（默认 1）
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0940_0944_smoke.json --overwrite
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0940_0944_full.json --overwrite
 ```
 
 ### 4.4 split 与 seed（对齐 plan）

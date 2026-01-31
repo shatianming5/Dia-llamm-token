@@ -1,0 +1,16 @@
+source: radgenome
+
+# Local RadGenome-ChestCT root (this machine).
+radgenome_root: /data/tiasha/RadGenome-ChestCT
+
+out_dir: artifacts/radgenome_raw_e0940_smoke
+manifest_path: artifacts/radgenome_raw_e0940_smoke/manifest.jsonl
+
+# Smoke: cap the filesystem scan, but still take "all found" within the cap.
+num_cases: 0
+max_volume_files: 5000
+seed: 0
+split: train
+
+use_region_report: false
+

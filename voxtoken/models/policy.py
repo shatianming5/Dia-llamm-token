@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from ..schemas import TokenFeatures
-from ..torch_compat import Module
+from ..torch_compat import Module, torch
 
 
 class SplitPolicy(Module):
@@ -15,6 +15,8 @@ class SplitPolicy(Module):
         super().__init__()
         self.cfg = cfg
         self.mode = str(cfg.get("mode", "heuristic"))
+        self.use_torch = False
+        self.torch_model = None
 
         weights_cfg = dict(cfg.get("weights", {}))
         self.weights: Dict[str, float] = {
@@ -37,8 +39,61 @@ class SplitPolicy(Module):
                         if k in w:
                             self.weights[k] = float(w[k])
 
+                model_path = payload.get("model_path", None)
+                model_cfg = payload.get("model", {}) if isinstance(payload, dict) else {}
+                if isinstance(model_path, str) and model_path.strip() and torch is not None:
+                    mp = Path(model_path.strip())
+                    if not mp.is_absolute():
+                        mp = p.parent / mp
+                    if mp.exists():
+                        try:
+                            from .policy_mlp import PolicyMLP
+                        except Exception:
+                            PolicyMLP = None  # type: ignore[assignment]
+
+                        if PolicyMLP is not None:
+                            try:
+                                input_dim = int((model_cfg or {}).get("input_dim", 4))
+                            except Exception:
+                                input_dim = 4
+                            raw_hidden = (model_cfg or {}).get("hidden_dims", [64, 64])
+                            if not isinstance(raw_hidden, list):
+                                raw_hidden = [64, 64]
+                            hidden_dims = [int(x) for x in raw_hidden if int(x) > 0] or [64, 64]
+                            activation = str((model_cfg or {}).get("activation", "relu"))
+
+                            m = PolicyMLP(input_dim=int(input_dim), hidden_dims=list(hidden_dims), activation=str(activation))
+                            state = torch.load(str(mp), map_location="cpu")
+                            if isinstance(state, dict) and "state_dict" in state and isinstance(state["state_dict"], dict):
+                                state = state["state_dict"]
+                            if isinstance(state, dict):
+                                m.load_state_dict(state)
+                                m.eval()
+                                self.torch_model = m
+                                self.use_torch = True
+
     def score(self, feats: List[TokenFeatures]) -> List[Tuple[int, float]]:
         """Returns (token_id, score)."""
+        if self.use_torch and torch is not None and self.torch_model is not None and feats:
+            x = torch.tensor(
+                [
+                    [
+                        float(f.recon_error),
+                        float(f.evidence_entropy),
+                        float(f.citation_pressure),
+                        float(f.history_splits),
+                    ]
+                    for f in feats
+                ],
+                dtype=torch.float32,
+            )
+            with torch.no_grad():
+                y = self.torch_model(x)
+            scores = [float(v) for v in y.detach().cpu().view(-1).tolist()]
+            scored = [(int(f.token_id), float(s)) for f, s in zip(feats, scores)]
+            scored.sort(key=lambda x: (-float(x[1]), int(x[0])))
+            return scored
+
         w_recon = float(self.weights.get("recon_error", 1.0))
         w_ent = float(self.weights.get("evidence_entropy", 1.0))
         w_cit = float(self.weights.get("citation_pressure", 1.0))

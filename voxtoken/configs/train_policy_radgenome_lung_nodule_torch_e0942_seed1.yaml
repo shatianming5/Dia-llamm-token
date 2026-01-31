@@ -1,0 +1,24 @@
+# Train policy config (torch/DDP) (RadGenome-ChestCT anatomy mask: lung nodule) (E0942 seed1)
+
+run_id: E0942_seed1
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/radgenome_policy_dataset_lung_nodule_e0942/dataset.jsonl
+
+seed: 1
+
+ddp:
+  backend: nccl
+  fp16: false
+
+train:
+  epochs: 3
+  batch_size: 4096
+  lr: 1.0e-3
+  weight_decay: 0.0
+  ridge: 1.0e-6
+
+model:
+  hidden_dims: [64, 64]
+  activation: relu
+

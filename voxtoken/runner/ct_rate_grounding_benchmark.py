@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import random
 import sys
 import time
 from collections import defaultdict
@@ -21,6 +22,13 @@ Box = Tuple[float, float, float, float, float, float]  # x0,x1,y0,y1,z0,z1 (mm)
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _stable_int_hash(s: str) -> int:
+    h = 0
+    for ch in str(s):
+        h = (h * 131 + ord(ch)) % 2147483647
+    return int(h)
 
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
@@ -162,6 +170,24 @@ def _select_splits(policy: SplitPolicy, feats: List[TokenFeatures], *, budget_le
     return [int(tid) for tid, _ in scored[:max_splits]]
 
 
+def _select_splits_random(
+    pyramid: TokenPyramid,
+    tokens: List[Token],
+    *,
+    rng: random.Random,
+    budget_left: int,
+    max_splits_per_round: int,
+) -> List[int]:
+    if budget_left <= 0:
+        return []
+    max_splits = max(0, min(int(budget_left), int(max_splits_per_round)))
+    if max_splits <= 0:
+        return []
+    cands = [int(t.token_id) for t in tokens if pyramid.children_map.get(int(t.token_id), [])]
+    rng.shuffle(cands)
+    return [int(x) for x in cands[:max_splits]]
+
+
 def _refine_select(pyramid: TokenPyramid, tokens: List[Token], split_ids: Sequence[int], budget_B: int) -> Tuple[List[Token], List[int]]:
     # Replace selected parent tokens with their children (1 level deeper), respecting the budget.
     out: List[Token] = list(tokens)
@@ -217,6 +243,54 @@ def _best_iou_and_token(tokens: List[Token], gt_boxes: List[Box]) -> Tuple[float
     return float(max(0.0, best)), best_tid, best_box
 
 
+def _refine_select_oracle(
+    pyramid: TokenPyramid,
+    tokens: List[Token],
+    *,
+    gt_boxes: List[Box],
+    budget_B: int,
+    max_splits: int,
+) -> Tuple[List[Token], List[int]]:
+    tk = list(tokens)
+    executed: List[int] = []
+
+    for _i in range(max(0, int(max_splits))):
+        base_iou, _tid, _box = _best_iou_and_token(tk, gt_boxes)
+        best_pid: int | None = None
+        best_impr = 0.0
+
+        for t in tk:
+            pid = int(t.token_id)
+            child_ids = list(pyramid.children_map.get(pid, []))
+            if not child_ids:
+                continue
+
+            new_count = int(len(tk) - 1 + len(child_ids))
+            if new_count > int(budget_B):
+                continue
+
+            tk_candidate = [x for x in tk if int(x.token_id) != pid] + [pyramid.token_by_id[cid] for cid in child_ids if cid in pyramid.token_by_id]
+            cand_iou, _ctid, _cbox = _best_iou_and_token(tk_candidate, gt_boxes)
+            impr = float(cand_iou) - float(base_iou)
+
+            if impr > best_impr + 1e-12:
+                best_impr = float(impr)
+                best_pid = int(pid)
+            elif abs(impr - best_impr) <= 1e-12 and best_pid is not None and int(pid) < int(best_pid):
+                best_pid = int(pid)
+
+        if best_pid is None or float(best_impr) <= 0.0:
+            break
+
+        tk2, ex = _refine_select(pyramid, tk, [int(best_pid)], int(budget_B))
+        if not ex or len(tk2) == len(tk):
+            break
+        executed.extend(list(ex))
+        tk = tk2
+
+    return tk, executed
+
+
 def ct_rate_grounding_benchmark(
     *,
     manifest_jsonl: Path,
@@ -226,6 +300,7 @@ def ct_rate_grounding_benchmark(
     max_cases: int,
     split: str,
     policy_ckpt: str,
+    seed: int,
 ) -> Dict[str, Any]:
     rows = _load_jsonl(manifest_jsonl)
     rows.sort(key=lambda r: str(r.get("case_id", "")).strip())
@@ -282,22 +357,56 @@ def ct_rate_grounding_benchmark(
         for budget_B in budgets_sorted:
             base_tokens = tokenizer.select_tokens(pyramid, active_nodes=[], budget_B=int(budget_B))
 
-            for method in ["fixed", "heuristic", "learned"]:
+            for method in ["fixed", "heuristic", "learned", "random", "oracle"]:
                 t0 = time.perf_counter()
                 tk = list(base_tokens)
 
                 executed_split_ids: List[int] = []
-                if method in {"heuristic", "learned"} and max_rounds > 0:
-                    pol = pol_learned if method == "learned" else pol_heuristic
+                rng = (
+                    random.Random(int(seed) + _stable_int_hash(f"{case_id}:{budget_B}:random"))
+                    if method == "random"
+                    else None
+                )
+                if max_rounds > 0:
                     for _k in range(int(max_rounds)):
-                        feats = [_token_feature_vector(t, volume=volume, voxel_spacing_mm=spacing) for t in tk]
-                        split_ids = _select_splits(
-                            pol,
-                            feats,
-                            budget_left=int(budget_B) - int(len(tk)),
-                            max_splits_per_round=int(max_splits_per_round or (int(budget_B) - int(len(tk)))),
-                        )
-                        tk2, executed = _refine_select(pyramid, tk, split_ids, int(budget_B))
+                        budget_left = int(budget_B) - int(len(tk))
+                        max_splits = int(max_splits_per_round or max(0, budget_left))
+
+                        tk2: List[Token]
+                        executed: List[int]
+                        if method in {"heuristic", "learned"}:
+                            pol = pol_learned if method == "learned" else pol_heuristic
+                            feats = [_token_feature_vector(t, volume=volume, voxel_spacing_mm=spacing) for t in tk]
+                            split_ids = _select_splits(
+                                pol,
+                                feats,
+                                budget_left=int(budget_left),
+                                max_splits_per_round=int(max_splits),
+                            )
+                            tk2, executed = _refine_select(pyramid, tk, split_ids, int(budget_B))
+                        elif method == "random":
+                            if rng is None:
+                                break
+                            split_ids = _select_splits_random(
+                                pyramid,
+                                tk,
+                                rng=rng,
+                                budget_left=int(budget_left),
+                                max_splits_per_round=int(max_splits),
+                            )
+                            tk2, executed = _refine_select(pyramid, tk, split_ids, int(budget_B))
+                        elif method == "oracle":
+                            max_splits_eff = max(0, min(int(budget_left), int(max_splits)))
+                            tk2, executed = _refine_select_oracle(
+                                pyramid,
+                                tk,
+                                gt_boxes=list(gt_boxes),
+                                budget_B=int(budget_B),
+                                max_splits=int(max_splits_eff),
+                            )
+                        else:
+                            tk2, executed = tk, []
+
                         executed_split_ids.extend(list(executed))
                         if len(tk2) == len(tk):
                             break
@@ -325,6 +434,7 @@ def ct_rate_grounding_benchmark(
                         "best_token_box_mm": ([float(x) for x in best_box] if best_box is not None else None),
                         "executed_split_ids": list(executed_split_ids),
                         "volume_loader": volume_loader,
+                        "seed": int(seed),
                     }
                 )
 
@@ -358,6 +468,7 @@ def ct_rate_grounding_benchmark(
         "timestamp_utc": _utc_now_iso(),
         "manifest": str(manifest_jsonl),
         "split": str(split_norm),
+        "seed": int(seed),
         "out_dir": str(out_dir),
         "metrics_jsonl_path": str(metrics_path),
         "n_cases": int(len({str(r.get("case_id", "")) for r in metrics_rows if str(r.get("case_id", "")).strip()})),
@@ -376,6 +487,7 @@ def main() -> None:
     parser.add_argument("--max-cases", type=int, default=0, help="Max cases (0 = no limit)")
     parser.add_argument("--split", default="", help="Optional split filter (train|val|test)")
     parser.add_argument("--policy-ckpt", default="", help="Path to learned policy checkpoint.json")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed (affects random baseline and tie-breaking)")
     args = parser.parse_args()
 
     cfg_path = Path(args.config)
@@ -399,6 +511,7 @@ def main() -> None:
             max_cases=int(args.max_cases or 0),
             split=str(args.split),
             policy_ckpt=str(args.policy_ckpt),
+            seed=int(args.seed),
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[ERR] {exc}", file=sys.stderr)

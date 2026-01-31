@@ -1,0 +1,11 @@
+in_manifest: artifacts/radgenome_raw_e0940_smoke/manifest.jsonl
+
+out_dir: artifacts/radgenome_proc_e0940_smoke
+out_manifest: artifacts/radgenome_proc_e0940_smoke/manifest.jsonl
+
+seed: 1
+split:
+  train: 0.8
+  val: 0.2
+  test: 0.0
+
