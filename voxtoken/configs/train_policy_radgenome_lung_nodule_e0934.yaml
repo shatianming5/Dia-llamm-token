@@ -1,0 +1,10 @@
+# Train policy config (RadGenome-ChestCT anatomy mask: lung nodule) (E0934)
+
+run_id: E0934
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/radgenome_policy_dataset_lung_nodule_e0934/dataset.jsonl
+
+train:
+  ridge: 1.0e-6
+

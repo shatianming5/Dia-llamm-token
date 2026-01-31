@@ -128,6 +128,18 @@ python -m voxtoken.data.radgenome_mask_manifest \\
   --radgenome-root /data/tiasha/RadGenome-ChestCT \\
   --mask "lung effusion" \\
   --max-cases-train 20 --max-cases-val 5 --max-cases-test 0
+
+# 例：同样方式构建 lung nodule（RadGenome anatomy mask 名称：\"lung nodule\"）
+python -m voxtoken.data.radgenome_mask_manifest \\
+  --in artifacts/radgenome_proc_e0930/manifest.jsonl \\
+  --out artifacts/radgenome_gt_lung_nodule_e0933 \\
+  --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml \\
+  --radgenome-root /data/tiasha/RadGenome-ChestCT \\
+  --mask "lung nodule" \\
+  --max-cases-train 40 --max-cases-val 10 --max-cases-test 0
+
+# 例：一键跑 RadGenome lung nodule 端到端闭环（E0933–E0935）
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0933_0935.json --overwrite
 ```
 
 ### 4.4 split 与 seed（对齐 plan）

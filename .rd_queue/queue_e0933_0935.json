@@ -1,0 +1,45 @@
+[
+  {
+    "id": "E0933",
+    "stage": "smoke",
+    "name": "Build GT manifest from RadGenome masks (lung nodule)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.radgenome_mask_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --out artifacts/radgenome_gt_lung_nodule_e0933 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --radgenome-root /data/tiasha/RadGenome-ChestCT --mask \"lung nodule\" --max-cases-train 40 --max-cases-val 10 --max-cases-test 0 && python -m voxtoken.runner.validate_ct_rate_ts_manifest --in artifacts/radgenome_gt_lung_nodule_e0933/manifest.jsonl --require-n-ge 5 --require-gt-is-pseudo --require-coord-system token_space_mm && python -m voxtoken.runner.validate_split_counts --in artifacts/radgenome_gt_lung_nodule_e0933/manifest.jsonl --require-train-ge 1 --require-val-ge 1",
+    "workdir": "."
+  },
+  {
+    "id": "E0933",
+    "stage": "full",
+    "name": "Build GT manifest from RadGenome masks (lung nodule)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.radgenome_mask_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --out artifacts/radgenome_gt_lung_nodule_e0933 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --radgenome-root /data/tiasha/RadGenome-ChestCT --mask \"lung nodule\" --max-cases-train 40 --max-cases-val 10 --max-cases-test 0 && python -m voxtoken.runner.validate_ct_rate_ts_manifest --in artifacts/radgenome_gt_lung_nodule_e0933/manifest.jsonl --require-n-ge 10 --require-gt-is-pseudo --require-coord-system token_space_mm && python -m voxtoken.runner.validate_split_counts --in artifacts/radgenome_gt_lung_nodule_e0933/manifest.jsonl --require-train-ge 5 --require-val-ge 2",
+    "workdir": "."
+  },
+  {
+    "id": "E0934",
+    "stage": "smoke",
+    "name": "Train policy + benchmark (RadGenome lung nodule)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.radgenome_mask_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --out artifacts/radgenome_gt_lung_nodule_e0933 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --radgenome-root /data/tiasha/RadGenome-ChestCT --mask \"lung nodule\" --max-cases-train 40 --max-cases-val 10 --max-cases-test 0 && python -m voxtoken.runner.build_policy_dataset_multi --manifest artifacts/radgenome_gt_lung_nodule_e0933/manifest.jsonl --out artifacts/radgenome_policy_dataset_lung_nodule_e0934/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 0 --split train && python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_radgenome_lung_nodule_e0934.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0934/checkpoint.json --require-nondefault-weights && python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_e0933/manifest.jsonl --out artifacts/e0934_benchmark_radgenome_lung_nodule --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 --max-cases 5 --split val --policy-ckpt outputs/train_policy/E0934/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0934_benchmark_radgenome_lung_nodule/summary.json --require-methods fixed heuristic learned",
+    "workdir": "."
+  },
+  {
+    "id": "E0934",
+    "stage": "full",
+    "name": "Train policy + benchmark (RadGenome lung nodule)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.radgenome_mask_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --out artifacts/radgenome_gt_lung_nodule_e0933 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --radgenome-root /data/tiasha/RadGenome-ChestCT --mask \"lung nodule\" --max-cases-train 40 --max-cases-val 10 --max-cases-test 0 && python -m voxtoken.runner.build_policy_dataset_multi --manifest artifacts/radgenome_gt_lung_nodule_e0933/manifest.jsonl --out artifacts/radgenome_policy_dataset_lung_nodule_e0934/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 0 --split train && python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_radgenome_lung_nodule_e0934.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0934/checkpoint.json --require-nondefault-weights && python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_e0933/manifest.jsonl --out artifacts/e0934_benchmark_radgenome_lung_nodule --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 0 --split val --policy-ckpt outputs/train_policy/E0934/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0934_benchmark_radgenome_lung_nodule/summary.json --require-methods fixed heuristic learned",
+    "workdir": "."
+  },
+  {
+    "id": "E0935",
+    "stage": "smoke",
+    "name": "Paper export (RadGenome lung nodule benchmark)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0934_benchmark_radgenome_lung_nodule/metrics.jsonl --out artifacts/paper_e0935_radgenome_lung_nodule && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0935_radgenome_lung_nodule",
+    "workdir": "."
+  },
+  {
+    "id": "E0935",
+    "stage": "full",
+    "name": "Paper export (RadGenome lung nodule benchmark) (full==smoke)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0934_benchmark_radgenome_lung_nodule/metrics.jsonl --out artifacts/paper_e0935_radgenome_lung_nodule && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0935_radgenome_lung_nodule",
+    "workdir": "."
+  }
+]
+
