@@ -1,0 +1,16 @@
+[
+  {
+    "id": "E0811",
+    "stage": "smoke",
+    "name": "batch infer+eval CT-RATE validation (all rows)",
+    "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --out artifacts/e0811 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 0 --require-volume-loader nifti; python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0811/metrics.jsonl --require-n-ge 20",
+    "workdir": "."
+  },
+  {
+    "id": "E0811",
+    "stage": "full",
+    "name": "batch infer+eval CT-RATE validation (all rows, full==smoke)",
+    "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --out artifacts/e0811 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 0 --require-volume-loader nifti; python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0811/metrics.jsonl --require-n-ge 20",
+    "workdir": "."
+  }
+]

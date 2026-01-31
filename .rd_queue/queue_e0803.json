@@ -1,0 +1,16 @@
+[
+  {
+    "id": "E0803",
+    "stage": "smoke",
+    "name": "CT-RATE ingest + preprocess + validate manifest",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_e0803.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_e0803.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_proc_e0803/manifest.jsonl --require-n-ge 20 --valid-splits train val test --require-report-path-exists --require-volume-path-exists --require-nonempty-volume-paths-ge 20",
+    "workdir": "."
+  },
+  {
+    "id": "E0803",
+    "stage": "full",
+    "name": "CT-RATE ingest + preprocess + validate manifest (full==smoke)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_e0803.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_e0803.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_proc_e0803/manifest.jsonl --require-n-ge 20 --valid-splits train val test --require-report-path-exists --require-volume-path-exists --require-nonempty-volume-paths-ge 20",
+    "workdir": "."
+  }
+]

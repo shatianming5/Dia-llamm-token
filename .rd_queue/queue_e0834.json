@@ -1,0 +1,17 @@
+[
+  {
+    "id": "E0834",
+    "stage": "smoke",
+    "name": "counterfactual citation swap (slot-supported unsupported)",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0834 --budget 16 --config voxtoken/configs/inference_evidence_ckpt.yaml; python -m voxtoken.runner.counterfactual_eval --in artifacts/e0834/run.json --out artifacts/e0834_cf; python -m voxtoken.runner.validate_counterfactuals --in artifacts/e0834_cf/counterfactuals.json --require-citation-swap-gt-base --require-remove-citations-gt-base --require-base-le 0.01",
+    "workdir": "."
+  },
+  {
+    "id": "E0834",
+    "stage": "full",
+    "name": "counterfactual citation swap (slot-supported unsupported) (full==smoke)",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0834 --budget 16 --config voxtoken/configs/inference_evidence_ckpt.yaml; python -m voxtoken.runner.counterfactual_eval --in artifacts/e0834/run.json --out artifacts/e0834_cf; python -m voxtoken.runner.validate_counterfactuals --in artifacts/e0834_cf/counterfactuals.json --require-citation-swap-gt-base --require-remove-citations-gt-base --require-base-le 0.01",
+    "workdir": "."
+  }
+]
+

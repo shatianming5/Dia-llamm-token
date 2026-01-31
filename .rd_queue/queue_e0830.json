@@ -1,0 +1,17 @@
+[
+  {
+    "id": "E0830",
+    "stage": "smoke",
+    "name": "CT-RATE report from labels_pos (single)",
+    "command": "python -m voxtoken.runner.ct_rate_report_from_labels --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --case-id valid_1_a_1 --out artifacts/e0830 && python -m voxtoken.runner.ct_rate_label_eval --run artifacts/e0830/run.json --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0830_label --case-id valid_1_a_1 && python -m voxtoken.runner.validate_label_metrics --in artifacts/e0830_label/label_metrics.json --require-n-gold-pos-gt 0 --require-f1-ge 0.99",
+    "workdir": "."
+  },
+  {
+    "id": "E0830",
+    "stage": "full",
+    "name": "CT-RATE report from labels_pos (single) (full==smoke)",
+    "command": "python -m voxtoken.runner.ct_rate_report_from_labels --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --case-id valid_1_a_1 --out artifacts/e0830 && python -m voxtoken.runner.ct_rate_label_eval --run artifacts/e0830/run.json --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0830_label --case-id valid_1_a_1 && python -m voxtoken.runner.validate_label_metrics --in artifacts/e0830_label/label_metrics.json --require-n-gold-pos-gt 0 --require-f1-ge 0.99",
+    "workdir": "."
+  }
+]
+

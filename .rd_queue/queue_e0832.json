@@ -1,0 +1,17 @@
+[
+  {
+    "id": "E0832",
+    "stage": "smoke",
+    "name": "infer_refine sidecar artifacts",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0832 --budget 16 --config voxtoken/configs/inference.yaml && python -m voxtoken.runner.validate_run --in artifacts/e0832/run.json --require-final-report-txt --require-evidence-graph-json --require-trace-jsonl",
+    "workdir": "."
+  },
+  {
+    "id": "E0832",
+    "stage": "full",
+    "name": "infer_refine sidecar artifacts (full==smoke)",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0832 --budget 16 --config voxtoken/configs/inference.yaml && python -m voxtoken.runner.validate_run --in artifacts/e0832/run.json --require-final-report-txt --require-evidence-graph-json --require-trace-jsonl",
+    "workdir": "."
+  }
+]
+

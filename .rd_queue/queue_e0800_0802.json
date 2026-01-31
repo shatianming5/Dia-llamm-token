@@ -1,0 +1,44 @@
+[
+  {
+    "id": "E0800",
+    "stage": "smoke",
+    "name": "reproduce (E0200)",
+    "command": "python -m voxtoken.runner.reproduce --exp E0200 --ledger docs/experiment.md",
+    "workdir": "."
+  },
+  {
+    "id": "E0800",
+    "stage": "full",
+    "name": "reproduce (E0200, full==smoke)",
+    "command": "python -m voxtoken.runner.reproduce --exp E0200 --ledger docs/experiment.md",
+    "workdir": "."
+  },
+  {
+    "id": "E0801",
+    "stage": "smoke",
+    "name": "counterfactual eval (citation removal)",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0801 --budget 16 --config voxtoken/configs/inference.yaml; python -m voxtoken.runner.counterfactual_eval --in artifacts/e0801/run.json --out artifacts/e0801_cf; python -m voxtoken.runner.validate_counterfactuals --in artifacts/e0801_cf/counterfactuals.json --require-remove-citations-gt-base",
+    "workdir": "."
+  },
+  {
+    "id": "E0801",
+    "stage": "full",
+    "name": "counterfactual eval (citation removal, full==smoke)",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0801 --budget 16 --config voxtoken/configs/inference.yaml; python -m voxtoken.runner.counterfactual_eval --in artifacts/e0801/run.json --out artifacts/e0801_cf; python -m voxtoken.runner.validate_counterfactuals --in artifacts/e0801_cf/counterfactuals.json --require-remove-citations-gt-base",
+    "workdir": "."
+  },
+  {
+    "id": "E0802",
+    "stage": "smoke",
+    "name": "data ingest + preprocess + validate manifest",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_e0802.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_e0802.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/data_proc_e0802/manifest.jsonl --require-n-ge 10 --valid-splits train val test",
+    "workdir": "."
+  },
+  {
+    "id": "E0802",
+    "stage": "full",
+    "name": "data ingest + preprocess + validate manifest (full==smoke)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_e0802.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_e0802.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/data_proc_e0802/manifest.jsonl --require-n-ge 10 --valid-splits train val test",
+    "workdir": "."
+  }
+]

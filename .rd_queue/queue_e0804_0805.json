@@ -1,0 +1,30 @@
+[
+  {
+    "id": "E0804",
+    "stage": "smoke",
+    "name": "CT-RATE train reports ingest + preprocess + validate manifest",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_train_e0804.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_train_e0804.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_train_proc_e0804/manifest.jsonl --require-n-ge 200 --valid-splits train val test --require-report-path-exists --require-case-id-prefix train_",
+    "workdir": "."
+  },
+  {
+    "id": "E0804",
+    "stage": "full",
+    "name": "CT-RATE train reports ingest + preprocess + validate manifest (full==smoke)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_train_e0804.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_train_e0804.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_train_proc_e0804/manifest.jsonl --require-n-ge 200 --valid-splits train val test --require-report-path-exists --require-case-id-prefix train_",
+    "workdir": "."
+  },
+  {
+    "id": "E0805",
+    "stage": "smoke",
+    "name": "infer_refine from CT-RATE manifest case (nifti)",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0805 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --case-id valid_1_a_1; python -m voxtoken.runner.validate_run --in artifacts/e0805/run.json --require-meta-input --require-meta-input-case-id valid_1_a_1 --require-meta-input-volume-loader nifti --require-meta-input-volume-path-exists; python -m voxtoken.runner.unified_eval --in artifacts/e0805/run.json --out artifacts/e0805_eval --case-id valid_1_a_1",
+    "workdir": "."
+  },
+  {
+    "id": "E0805",
+    "stage": "full",
+    "name": "infer_refine from CT-RATE manifest case (nifti, full==smoke)",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0805 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --case-id valid_1_a_1; python -m voxtoken.runner.validate_run --in artifacts/e0805/run.json --require-meta-input --require-meta-input-case-id valid_1_a_1 --require-meta-input-volume-loader nifti --require-meta-input-volume-path-exists; python -m voxtoken.runner.unified_eval --in artifacts/e0805/run.json --out artifacts/e0805_eval --case-id valid_1_a_1",
+    "workdir": "."
+  }
+]

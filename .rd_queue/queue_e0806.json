@@ -1,0 +1,16 @@
+[
+  {
+    "id": "E0806",
+    "stage": "smoke",
+    "name": "infer_refine from CT-RATE train manifest (dummy volume fallback)",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0806 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_train_proc_e0804/manifest.jsonl --case-id train_1_a_1; python -m voxtoken.runner.validate_run --in artifacts/e0806/run.json --require-meta-input --require-meta-input-case-id train_1_a_1 --require-meta-input-volume-loader dummy --require-meta-input-report-path-exists; python -m voxtoken.runner.unified_eval --in artifacts/e0806/run.json --out artifacts/e0806_eval --case-id train_1_a_1",
+    "workdir": "."
+  },
+  {
+    "id": "E0806",
+    "stage": "full",
+    "name": "infer_refine from CT-RATE train manifest (dummy volume fallback, full==smoke)",
+    "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0806 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_train_proc_e0804/manifest.jsonl --case-id train_1_a_1; python -m voxtoken.runner.validate_run --in artifacts/e0806/run.json --require-meta-input --require-meta-input-case-id train_1_a_1 --require-meta-input-volume-loader dummy --require-meta-input-report-path-exists; python -m voxtoken.runner.unified_eval --in artifacts/e0806/run.json --out artifacts/e0806_eval --case-id train_1_a_1",
+    "workdir": "."
+  }
+]

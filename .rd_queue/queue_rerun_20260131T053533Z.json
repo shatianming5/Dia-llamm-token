@@ -1,0 +1,260 @@
+{
+  "jobs": [
+    {
+      "id": "E0000",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0001",
+      "command": "python -m voxtoken.runner.smoke --out artifacts/smoke",
+      "workdir": "."
+    },
+    {
+      "id": "E0001",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0002",
+      "command": "python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artifacts/eval",
+      "workdir": "."
+    },
+    {
+      "id": "E0100",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0003",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16 --config voxtoken/configs/inference.yaml",
+      "workdir": "."
+    },
+    {
+      "id": "E0101",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0004",
+      "command": "python -m voxtoken.runner.unified_eval --in artifacts/infer/run.json --out artifacts/infer_eval",
+      "workdir": "."
+    },
+    {
+      "id": "E0200",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0005",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0200 --budget 16 --config voxtoken/configs/inference_heuristic.yaml; python -m voxtoken.runner.unified_eval --in artifacts/e0200/run.json --out artifacts/e0200_eval",
+      "workdir": "."
+    },
+    {
+      "id": "E0300",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0006",
+      "command": "python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_e0300.yaml; python -m voxtoken.runner.infer_refine --out artifacts/e0300 --budget 16 --config voxtoken/configs/inference_learned_policy.yaml; python -m voxtoken.runner.unified_eval --in artifacts/e0300/run.json --out artifacts/e0300_eval",
+      "workdir": "."
+    },
+    {
+      "id": "E0400",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0007",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0400 --budget 16 --config voxtoken/configs/inference_no_citation.yaml; python -m voxtoken.runner.unified_eval --in artifacts/e0400/run.json --out artifacts/e0400_eval",
+      "workdir": "."
+    },
+    {
+      "id": "E0401",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0008",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0401 --budget 16 --config voxtoken/configs/inference_no_constrained.yaml; python -m voxtoken.runner.unified_eval --in artifacts/e0401/run.json --out artifacts/e0401_eval",
+      "workdir": "."
+    },
+    {
+      "id": "E0500",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0009",
+      "command": "python -m voxtoken.runner.train_tokenizer --config voxtoken/configs/train_tokenizer_e0500.yaml; python -m voxtoken.runner.infer_refine --out artifacts/e0500 --budget 16 --config voxtoken/configs/inference_tokenizer_ckpt.yaml; python -m voxtoken.runner.validate_run --in artifacts/e0500/run.json --require-tokenizer-codes; python -m voxtoken.runner.unified_eval --in artifacts/e0500/run.json --out artifacts/e0500_eval",
+      "workdir": "."
+    },
+    {
+      "id": "E0600",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0010",
+      "command": "python -m voxtoken.runner.train_tokenizer --config voxtoken/configs/train_tokenizer_e0500.yaml; python -m voxtoken.runner.train_evidence --config voxtoken/configs/train_evidence_e0600.yaml; python -m voxtoken.runner.infer_refine --out artifacts/e0600 --budget 16 --config voxtoken/configs/inference_evidence_ckpt.yaml; python -m voxtoken.runner.validate_run --in artifacts/e0600/run.json --require-tokenizer-codes --require-finding-types-ge 2; python -m voxtoken.runner.unified_eval --in artifacts/e0600/run.json --out artifacts/e0600_eval",
+      "workdir": "."
+    },
+    {
+      "id": "E0700",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0011",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0700 --budget 16 --config voxtoken/configs/inference.yaml; python -m voxtoken.runner.unified_eval --in artifacts/e0700/run.json --out artifacts/e0700_eval; python -m voxtoken.runner.validate_metrics --in artifacts/e0700_eval/metrics.json --require-slot-f1-ge 0.99",
+      "workdir": "."
+    },
+    {
+      "id": "E0701",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0012",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0701 --budget 16 --config voxtoken/configs/inference.yaml; python -m voxtoken.runner.unified_eval --in artifacts/e0701/run.json --out artifacts/e0701_eval; python -m voxtoken.runner.validate_metrics --in artifacts/e0701_eval/metrics.json --require-latency-total-gt 0",
+      "workdir": "."
+    },
+    {
+      "id": "E0800",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0013",
+      "command": "python -m voxtoken.runner.reproduce --exp E0200 --ledger docs/experiment.md",
+      "workdir": "."
+    },
+    {
+      "id": "E0801",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0014",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0801 --budget 16 --config voxtoken/configs/inference.yaml; python -m voxtoken.runner.counterfactual_eval --in artifacts/e0801/run.json --out artifacts/e0801_cf; python -m voxtoken.runner.validate_counterfactuals --in artifacts/e0801_cf/counterfactuals.json --require-remove-citations-gt-base",
+      "workdir": "."
+    },
+    {
+      "id": "E0802",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0015",
+      "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_e0802.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_e0802.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/data_proc_e0802/manifest.jsonl --require-n-ge 10 --valid-splits train val test",
+      "workdir": "."
+    },
+    {
+      "id": "E0803",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0016",
+      "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_e0803.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_e0803.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_proc_e0803/manifest.jsonl --require-n-ge 20 --valid-splits train val test --require-report-path-exists --require-volume-path-exists --require-nonempty-volume-paths-ge 20",
+      "workdir": "."
+    },
+    {
+      "id": "E0804",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0017",
+      "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_train_e0804.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_train_e0804.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_train_proc_e0804/manifest.jsonl --require-n-ge 200 --valid-splits train val test --require-report-path-exists --require-case-id-prefix train_",
+      "workdir": "."
+    },
+    {
+      "id": "E0805",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0018",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0805 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --case-id valid_1_a_1; python -m voxtoken.runner.validate_run --in artifacts/e0805/run.json --require-meta-input --require-meta-input-case-id valid_1_a_1 --require-meta-input-volume-loader nifti --require-meta-input-volume-path-exists; python -m voxtoken.runner.unified_eval --in artifacts/e0805/run.json --out artifacts/e0805_eval --case-id valid_1_a_1",
+      "workdir": "."
+    },
+    {
+      "id": "E0806",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0019",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0806 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_train_proc_e0804/manifest.jsonl --case-id train_1_a_1; python -m voxtoken.runner.validate_run --in artifacts/e0806/run.json --require-meta-input --require-meta-input-case-id train_1_a_1 --require-meta-input-volume-loader dummy --require-meta-input-report-path-exists; python -m voxtoken.runner.unified_eval --in artifacts/e0806/run.json --out artifacts/e0806_eval --case-id train_1_a_1",
+      "workdir": "."
+    },
+    {
+      "id": "E0810",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0020",
+      "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --out artifacts/e0810 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 5 --require-volume-loader nifti; python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0810/metrics.jsonl --require-n-ge 5",
+      "workdir": "."
+    },
+    {
+      "id": "E0811",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0021",
+      "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --out artifacts/e0811 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 0 --require-volume-loader nifti; python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0811/metrics.jsonl --require-n-ge 20",
+      "workdir": "."
+    },
+    {
+      "id": "E0820",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0022",
+      "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_labeled_e0820.yaml; python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_labeled_e0820.yaml; python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --require-n-ge 20 --valid-splits train val test --require-report-path-exists --require-volume-path-exists --require-nonempty-volume-paths-ge 20 --require-case-id-prefix valid_ --require-labels-pos --require-nonempty-labels-pos-ge 1",
+      "workdir": "."
+    },
+    {
+      "id": "E0821",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0023",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0821 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --case-id valid_1_a_1; python -m voxtoken.runner.ct_rate_label_eval --run artifacts/e0821/run.json --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0821_label --case-id valid_1_a_1; python -m voxtoken.runner.validate_label_metrics --in artifacts/e0821_label/label_metrics.json --require-n-gold-pos-gt 0",
+      "workdir": "."
+    },
+    {
+      "id": "E0822",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0024",
+      "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0822 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 0 --require-volume-loader nifti; python -m voxtoken.runner.batch_label_eval --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --runs artifacts/e0822/runs --out artifacts/e0822_label; python -m voxtoken.runner.validate_label_metrics_jsonl --in artifacts/e0822_label/label_metrics.jsonl --require-n-ge 20",
+      "workdir": "."
+    },
+    {
+      "id": "E0830",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0025",
+      "command": "python -m voxtoken.runner.ct_rate_report_from_labels --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --case-id valid_1_a_1 --out artifacts/e0830 && python -m voxtoken.runner.ct_rate_label_eval --run artifacts/e0830/run.json --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0830_label --case-id valid_1_a_1 && python -m voxtoken.runner.validate_label_metrics --in artifacts/e0830_label/label_metrics.json --require-n-gold-pos-gt 0 --require-f1-ge 0.99",
+      "workdir": "."
+    },
+    {
+      "id": "E0831",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0026",
+      "command": "python -m voxtoken.runner.batch_ct_rate_report_from_labels --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0831 --max-cases 0 && python -m voxtoken.runner.batch_label_eval --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --runs artifacts/e0831/runs --out artifacts/e0831_label && python -m voxtoken.runner.validate_label_metrics_jsonl --in artifacts/e0831_label/label_metrics.jsonl --require-n-ge 10 --require-f1-ge 0.99",
+      "workdir": "."
+    },
+    {
+      "id": "E0832",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0027",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0832 --budget 16 --config voxtoken/configs/inference.yaml && python -m voxtoken.runner.validate_run --in artifacts/e0832/run.json --require-final-report-txt --require-evidence-graph-json --require-trace-jsonl",
+      "workdir": "."
+    },
+    {
+      "id": "E0833",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0028",
+      "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_train_proc_e0804/manifest.jsonl --out artifacts/e0833 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 50; python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0833/metrics.jsonl --require-n-ge 50",
+      "workdir": "."
+    },
+    {
+      "id": "E0834",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0029",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0834 --budget 16 --config voxtoken/configs/inference_evidence_ckpt.yaml; python -m voxtoken.runner.counterfactual_eval --in artifacts/e0834/run.json --out artifacts/e0834_cf; python -m voxtoken.runner.validate_counterfactuals --in artifacts/e0834_cf/counterfactuals.json --require-citation-swap-gt-base --require-remove-citations-gt-base --require-base-le 0.01",
+      "workdir": "."
+    },
+    {
+      "id": "E0900",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0030",
+      "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_synth_e0900.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_synth_e0900.yaml && python -m voxtoken.runner.validate_manifest --in artifacts/radgenome_proc_e0900/manifest.jsonl --require-n-ge 10 --valid-splits train val test --require-report-path-exists --require-case-id-prefix rg_",
+      "workdir": "."
+    },
+    {
+      "id": "E0901",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0030",
+      "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_synth_e0900.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_synth_e0900.yaml && python -m voxtoken.runner.infer_refine --out artifacts/e0901 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/radgenome_proc_e0900/manifest.jsonl --case-id rg_0000 && python -m voxtoken.runner.unified_eval --in artifacts/e0901/run.json --out artifacts/e0901_eval --manifest artifacts/radgenome_proc_e0900/manifest.jsonl --case-id-manifest rg_0000 --case-id rg_0000 && python -m voxtoken.runner.validate_metrics --in artifacts/e0901_eval/metrics.json --require-ground-hit-01-ge 0.99 && python -m voxtoken.runner.grounding_eval --run artifacts/e0901/run.json --out artifacts/e0901_ground --manifest artifacts/radgenome_proc_e0900/manifest.jsonl --case-id rg_0000 && python -m voxtoken.eval.visualize_grounding --in artifacts/e0901/run.json --out artifacts/e0901_viz --manifest artifacts/radgenome_proc_e0900/manifest.jsonl --case-id rg_0000 && test -f artifacts/e0901_viz/sent_000.svg",
+      "workdir": "."
+    },
+    {
+      "id": "E0902",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0031",
+      "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_synth_e0902.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_synth_e0902.yaml && python -m voxtoken.runner.build_policy_dataset --manifest artifacts/radgenome_proc_e0902/manifest.jsonl --case-id rg_0000 --config voxtoken/configs/inference_radgenome_split_heuristic_e0902.yaml --out artifacts/e0902_policy/dataset.jsonl && python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_radgenome_e0902.yaml && python -m voxtoken.runner.infer_refine --out artifacts/e0902_heuristic --budget 16 --config voxtoken/configs/inference_radgenome_split_heuristic_e0902.yaml --manifest artifacts/radgenome_proc_e0902/manifest.jsonl --case-id rg_0000 && python -m voxtoken.runner.unified_eval --in artifacts/e0902_heuristic/run.json --out artifacts/e0902_heuristic_eval --manifest artifacts/radgenome_proc_e0902/manifest.jsonl --case-id-manifest rg_0000 --case-id rg_0000 && python -m voxtoken.runner.infer_refine --out artifacts/e0902_learned --budget 16 --config voxtoken/configs/inference_radgenome_split_learned_e0902.yaml --manifest artifacts/radgenome_proc_e0902/manifest.jsonl --case-id rg_0000 && python -m voxtoken.runner.unified_eval --in artifacts/e0902_learned/run.json --out artifacts/e0902_learned_eval --manifest artifacts/radgenome_proc_e0902/manifest.jsonl --case-id-manifest rg_0000 --case-id rg_0000 && python -m voxtoken.runner.validate_policy_improvement --heuristic artifacts/e0902_heuristic_eval/metrics.json --learned artifacts/e0902_learned_eval/metrics.json --metric ground_mean_iou --require-delta-ge 0.05",
+      "workdir": "."
+    },
+    {
+      "id": "E0903",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0032",
+      "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_synth_e0902.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_synth_e0902.yaml && python -m voxtoken.runner.infer_refine --out artifacts/e0903 --budget 16 --config voxtoken/configs/inference_radgenome_split_heuristic_e0902.yaml --manifest artifacts/radgenome_proc_e0902/manifest.jsonl --case-id rg_0000 && python -m voxtoken.runner.counterfactual_eval --in artifacts/e0903/run.json --out artifacts/e0903_cf --manifest artifacts/radgenome_proc_e0902/manifest.jsonl --case-id rg_0000 && python -m voxtoken.runner.validate_counterfactuals --in artifacts/e0903_cf/counterfactuals.json --require-ground-hit01-permute-lt-base --require-ground-hit01-swap-lt-base --require-ground-hit01-drop-ge 0.5",
+      "workdir": "."
+    },
+    {
+      "id": "E0904",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0033",
+      "command": "python -m voxtoken.runner.train_tokenizer --config voxtoken/configs/train_tokenizer_e0500.yaml && python -m voxtoken.runner.validate_tokenizer_train_metrics --in outputs/train_tokenizer/E0500/metrics.json --require-perplexity-ge 2.0 --require-codebook-used-ge 2 && python -m voxtoken.runner.validate_recon_error_separation --config voxtoken/configs/inference.yaml --require-delta-ge 0.05 --require-max-ge 0.05 --require-min-le 0.001",
+      "workdir": "."
+    },
+    {
+      "id": "E0905",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0034",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0905 --budget 16 --config voxtoken/configs/inference.yaml && python -m voxtoken.runner.validate_run --in artifacts/e0905/run.json --require-final-report-txt --require-evidence-graph-json --require-trace-jsonl",
+      "workdir": "."
+    },
+    {
+      "id": "E0906",
+      "stage": "rerun_20260131T053533Z",
+      "name": "C0035",
+      "command": "python -m voxtoken.runner.infer_refine --out artifacts/e0906_a --budget 16 --config voxtoken/configs/inference_no_citation.yaml && python -m voxtoken.runner.infer_refine --out artifacts/e0906_b --budget 16 --config voxtoken/configs/inference_no_citation.yaml && python -m voxtoken.runner.validate_verifier_stability --a artifacts/e0906_a/run.json --b artifacts/e0906_b/run.json",
+      "workdir": "."
+    }
+  ],
+  "meta": {
+    "generated_at": "2026-01-31T05:35:33.772844+00:00",
+    "ledger": "docs/experiment.md"
+  }
+}

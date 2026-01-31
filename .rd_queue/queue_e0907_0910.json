@@ -1,0 +1,58 @@
+[
+  {
+    "id": "E0907",
+    "stage": "smoke",
+    "name": "CT-RATE TS GT manifest (lung_nodules)",
+    "command": "python -m voxtoken.data.ct_rate_ts_manifest --in artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --task lung_nodules --out artifacts/ct_rate_ts_nodule_gt_e0907 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 20 && python -m voxtoken.runner.validate_ct_rate_ts_manifest --in artifacts/ct_rate_ts_nodule_gt_e0907/manifest.jsonl --require-n-ge 5",
+    "workdir": "."
+  },
+  {
+    "id": "E0907",
+    "stage": "full",
+    "name": "CT-RATE TS GT manifest (lung_nodules) (full==smoke)",
+    "command": "python -m voxtoken.data.ct_rate_ts_manifest --in artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --task lung_nodules --out artifacts/ct_rate_ts_nodule_gt_e0907 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 20 && python -m voxtoken.runner.validate_ct_rate_ts_manifest --in artifacts/ct_rate_ts_nodule_gt_e0907/manifest.jsonl --require-n-ge 5",
+    "workdir": "."
+  },
+  {
+    "id": "E0908",
+    "stage": "smoke",
+    "name": "CT-RATE TS policy train (dataset)",
+    "command": "python -m voxtoken.runner.build_policy_dataset_multi --manifest artifacts/ct_rate_ts_nodule_gt_e0907/manifest.jsonl --out artifacts/ct_rate_policy_dataset_e0908/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 20 --split train && python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_ct_rate_ts_e0908.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0908/checkpoint.json --require-nondefault-weights",
+    "workdir": "."
+  },
+  {
+    "id": "E0908",
+    "stage": "full",
+    "name": "CT-RATE TS policy train (dataset) (full==smoke)",
+    "command": "python -m voxtoken.runner.build_policy_dataset_multi --manifest artifacts/ct_rate_ts_nodule_gt_e0907/manifest.jsonl --out artifacts/ct_rate_policy_dataset_e0908/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 20 --split train && python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_ct_rate_ts_e0908.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0908/checkpoint.json --require-nondefault-weights",
+    "workdir": "."
+  },
+  {
+    "id": "E0909",
+    "stage": "smoke",
+    "name": "CT-RATE TS grounding benchmark (multi-budget)",
+    "command": "python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/ct_rate_ts_nodule_gt_e0907/manifest.jsonl --out artifacts/e0909 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 20 --policy-ckpt outputs/train_policy/E0908/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0909/summary.json --require-methods fixed heuristic learned",
+    "workdir": "."
+  },
+  {
+    "id": "E0909",
+    "stage": "full",
+    "name": "CT-RATE TS grounding benchmark (multi-budget) (full==smoke)",
+    "command": "python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/ct_rate_ts_nodule_gt_e0907/manifest.jsonl --out artifacts/e0909 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 20 --policy-ckpt outputs/train_policy/E0908/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0909/summary.json --require-methods fixed heuristic learned",
+    "workdir": "."
+  },
+  {
+    "id": "E0910",
+    "stage": "smoke",
+    "name": "Paper export (tables/figures)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0909/metrics.jsonl --out artifacts/paper_e0910 && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0910",
+    "workdir": "."
+  },
+  {
+    "id": "E0910",
+    "stage": "full",
+    "name": "Paper export (tables/figures) (full==smoke)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0909/metrics.jsonl --out artifacts/paper_e0910 && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0910",
+    "workdir": "."
+  }
+]

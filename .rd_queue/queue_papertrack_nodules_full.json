@@ -1,0 +1,39 @@
+{
+  "jobs": [
+    {
+      "id": "E0911",
+      "stage": "full",
+      "name": "papertrack: TS nodule case index",
+      "command": "python -m voxtoken.data.build_ts_nodule_case_index --ts-csv /data/tiasha/CT-RATE/dataset/ts_seg/ts_lung_nodules/valid_metadata.csv --masks-root /data/tiasha/CT-RATE/dataset/ts_seg/ts_lung_nodules/valid_fixed --out artifacts/ct_rate_ts_nodules_index && python -m voxtoken.runner.validate_ts_case_index --in artifacts/ct_rate_ts_nodules_index/cases.jsonl --require-n-ge 20 --valid-splits train val test",
+      "workdir": "."
+    },
+    {
+      "id": "E0912",
+      "stage": "full",
+      "name": "papertrack: build nodule GT manifest (ts_index)",
+      "command": "python -m voxtoken.data.ct_rate_ts_manifest --in artifacts/ct_rate_ts_nodules_index/cases.jsonl --in-mode ts_index --task lung_nodules --out artifacts/ct_rate_ts_nodule_gt_paper_e0912 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 0 && python -m voxtoken.runner.validate_ct_rate_ts_manifest --in artifacts/ct_rate_ts_nodule_gt_paper_e0912/manifest.jsonl --require-n-ge 20 --require-gt-is-pseudo --require-coord-system token_space_mm",
+      "workdir": "."
+    },
+    {
+      "id": "E0913",
+      "stage": "full",
+      "name": "papertrack: build policy dataset",
+      "command": "python -m voxtoken.runner.build_policy_dataset_multi --manifest artifacts/ct_rate_ts_nodule_gt_paper_e0912/manifest.jsonl --out artifacts/ct_rate_policy_dataset_paper_e0913/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 0 --split train && python -m voxtoken.runner.validate_policy_dataset_jsonl --in artifacts/ct_rate_policy_dataset_paper_e0913/dataset.jsonl --require-rows-ge 80 --require-cases-ge 10",
+      "workdir": "."
+    },
+    {
+      "id": "E0914",
+      "stage": "full",
+      "name": "papertrack: train policy + benchmark + improvement gate",
+      "command": "python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_ct_rate_ts_paper_e0914.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0914/checkpoint.json --require-nondefault-weights && python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/ct_rate_ts_nodule_gt_paper_e0912/manifest.jsonl --out artifacts/e0914_benchmark --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 0 --policy-ckpt outputs/train_policy/E0914/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0914_benchmark/summary.json --require-methods fixed heuristic learned --require-improvement learned heuristic ground_mean_iou 0.0 0.2 --bootstrap-n 2000 --seed 0",
+      "workdir": "."
+    },
+    {
+      "id": "E0915",
+      "stage": "full",
+      "name": "papertrack: paper export (CI)",
+      "command": "python -m voxtoken.runner.paper_export --in artifacts/e0914_benchmark/metrics.jsonl --out artifacts/paper_e0915 && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0915",
+      "workdir": "."
+    }
+  ]
+}

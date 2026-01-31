@@ -1,0 +1,17 @@
+[
+  {
+    "id": "E0833",
+    "stage": "smoke",
+    "name": "batch 50-case artifacts (M0 scale)",
+    "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_train_proc_e0804/manifest.jsonl --out artifacts/e0833 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 50; python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0833/metrics.jsonl --require-n-ge 50",
+    "workdir": "."
+  },
+  {
+    "id": "E0833",
+    "stage": "full",
+    "name": "batch 50-case artifacts (M0 scale) (full==smoke)",
+    "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_train_proc_e0804/manifest.jsonl --out artifacts/e0833 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 50; python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0833/metrics.jsonl --require-n-ge 50",
+    "workdir": "."
+  }
+]
+

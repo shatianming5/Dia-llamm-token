@@ -1,0 +1,16 @@
+[
+  {
+    "id": "E0810",
+    "stage": "smoke",
+    "name": "batch infer+eval CT-RATE validation (nifti)",
+    "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --out artifacts/e0810 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 5 --require-volume-loader nifti; python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0810/metrics.jsonl --require-n-ge 5",
+    "workdir": "."
+  },
+  {
+    "id": "E0810",
+    "stage": "full",
+    "name": "batch infer+eval CT-RATE validation (nifti, full==smoke)",
+    "command": "python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --out artifacts/e0810 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 5 --require-volume-loader nifti; python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0810/metrics.jsonl --require-n-ge 5",
+    "workdir": "."
+  }
+]
