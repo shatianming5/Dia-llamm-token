@@ -17,6 +17,7 @@ class SplitPolicy(Module):
         self.mode = str(cfg.get("mode", "heuristic"))
         self.use_torch = False
         self.torch_model = None
+        self.torch_input_dim = 4
 
         weights_cfg = dict(cfg.get("weights", {}))
         self.weights: Dict[str, float] = {
@@ -70,23 +71,35 @@ class SplitPolicy(Module):
                                 m.load_state_dict(state)
                                 m.eval()
                                 self.torch_model = m
+                                self.torch_input_dim = int(input_dim)
                                 self.use_torch = True
 
     def score(self, feats: List[TokenFeatures]) -> List[Tuple[int, float]]:
         """Returns (token_id, score)."""
         if self.use_torch and torch is not None and self.torch_model is not None and feats:
-            x = torch.tensor(
-                [
-                    [
-                        float(f.recon_error),
-                        float(f.evidence_entropy),
-                        float(f.citation_pressure),
-                        float(f.history_splits),
-                    ]
-                    for f in feats
-                ],
-                dtype=torch.float32,
-            )
+            dim = int(getattr(self, "torch_input_dim", 4) or 4)
+            dim = max(4, min(16, int(dim)))
+
+            def vec(f: TokenFeatures) -> List[float]:
+                base = [
+                    float(f.recon_error),
+                    float(f.evidence_entropy),
+                    float(f.citation_pressure),
+                    float(f.history_splits),
+                ]
+                if dim >= 5:
+                    base.append(float(getattr(f, "center_x_mm", 0.0)))
+                if dim >= 6:
+                    base.append(float(getattr(f, "center_y_mm", 0.0)))
+                if dim >= 7:
+                    base.append(float(getattr(f, "center_z_mm", 0.0)))
+                if dim >= 8:
+                    base.append(float(getattr(f, "mean_intensity", 0.0)))
+                if dim >= 9:
+                    base.append(float(getattr(f, "max_intensity", 0.0)))
+                return base[:dim] + [0.0 for _ in range(max(0, dim - len(base)))]
+
+            x = torch.tensor([vec(f) for f in feats], dtype=torch.float32)
             with torch.no_grad():
                 y = self.torch_model(x)
             scores = [float(v) for v in y.detach().cpu().view(-1).tolist()]

@@ -97,9 +97,12 @@ def _fit_linear_weights(xs: List[List[float]], ys: List[float], *, ridge: float)
     return weights, meta
 
 
-def _load_dataset_jsonl(path: Path, *, max_samples: int) -> Tuple[List[List[float]], List[float]]:
+def _load_dataset_jsonl(path: Path, *, max_samples: int, input_dim: int) -> Tuple[List[List[float]], List[float]]:
     xs: List[List[float]] = []
     ys: List[float] = []
+    input_dim = int(input_dim)
+    if int(input_dim) < 4:
+        raise ValueError(f"model.input_dim must be >=4 (got {input_dim})")
     n = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -114,6 +117,19 @@ def _load_dataset_jsonl(path: Path, *, max_samples: int) -> Tuple[List[List[floa
                 float(obj.get("citation_pressure", 0.0)),
                 float(obj.get("history_splits", 0.0)),
             ]
+            if int(input_dim) >= 5:
+                x.append(float(obj.get("center_x_mm", 0.0)))
+            if int(input_dim) >= 6:
+                x.append(float(obj.get("center_y_mm", 0.0)))
+            if int(input_dim) >= 7:
+                x.append(float(obj.get("center_z_mm", 0.0)))
+            if int(input_dim) >= 8:
+                x.append(float(obj.get("mean_intensity", 0.0)))
+            if int(input_dim) >= 9:
+                x.append(float(obj.get("max_intensity", 0.0)))
+            if len(x) < int(input_dim):
+                x = x + [0.0 for _ in range(int(input_dim) - len(x))]
+            x = x[: int(input_dim)]
             y = float(obj.get("reward", 0.0))
         except Exception:
             continue
@@ -188,7 +204,8 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
     if device.type == "cuda":
         torch.cuda.manual_seed_all(int(seed) + int(rank))
 
-    xs, ys = _load_dataset_jsonl(dataset_jsonl, max_samples=int(max_samples))
+    input_dim = int(model_cfg.get("input_dim", 4))
+    xs, ys = _load_dataset_jsonl(dataset_jsonl, max_samples=int(max_samples), input_dim=int(input_dim))
     if not xs:
         raise ValueError("dataset_jsonl is empty or unreadable")
 
@@ -220,7 +237,7 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
     hidden_dims = [int(x) for x in hidden_dims_raw if int(x) > 0] or [64, 64]
     activation = str(model_cfg.get("activation", "relu"))
 
-    model = PolicyMLP(input_dim=4, hidden_dims=list(hidden_dims), activation=str(activation)).to(device)
+    model = PolicyMLP(input_dim=int(input_dim), hidden_dims=list(hidden_dims), activation=str(activation)).to(device)
     if distributed:
         import torch.distributed as dist  # type: ignore
         from torch.nn.parallel import DistributedDataParallel as DDP  # type: ignore
@@ -306,7 +323,7 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
             "fit_meta": dict(fit_meta),
             "model": {
                 "type": "mlp",
-                "input_dim": 4,
+                "input_dim": int(input_dim),
                 "hidden_dims": list(hidden_dims),
                 "activation": str(activation),
             },
@@ -347,4 +364,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

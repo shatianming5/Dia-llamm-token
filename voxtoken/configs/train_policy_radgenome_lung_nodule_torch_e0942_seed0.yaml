@@ -12,13 +12,15 @@ ddp:
   fp16: false
 
 train:
-  epochs: 3
-  batch_size: 4096
+  # Small dataset (~8 tokens × 400 cases). Use smaller batches + more epochs so the
+  # torch model actually learns a stable ranking.
+  epochs: 50
+  batch_size: 256
   lr: 1.0e-3
   weight_decay: 0.0
   ridge: 1.0e-6
 
 model:
+  input_dim: 4
   hidden_dims: [64, 64]
   activation: relu
-

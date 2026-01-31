@@ -174,14 +174,14 @@ class RefineRunner:
             return iz0, iz1, iy0, iy1, ix0, ix1
 
         def _patch_variance(token: Token) -> float:
-            # Welford variance over (C,D,H,W) patch.
+            # Welford mean/variance over (C,D,H,W) patch.
             try:
                 c = len(volume)  # type: ignore[arg-type]
                 d = len(volume[0])  # type: ignore[index]
                 h = len(volume[0][0])  # type: ignore[index]
                 w = len(volume[0][0][0])  # type: ignore[index]
             except Exception:
-                return 0.0
+                return 0.0, 0.0, 0.0
 
             z0, z1, y0, y1, x0, x1 = _box_mm_to_zyx_slices(token.omega_box_mm)
             z0 = max(0, min(int(z0), int(d)))
@@ -191,11 +191,12 @@ class RefineRunner:
             x0 = max(0, min(int(x0), int(w)))
             x1 = max(0, min(int(x1), int(w)))
             if z1 <= z0 or y1 <= y0 or x1 <= x0:
-                return 0.0
+                return 0.0, 0.0, 0.0
 
             n = 0
             mean = 0.0
             m2 = 0.0
+            vmax = float("-inf")
             for cc in range(int(c)):
                 for zz in range(int(z0), int(z1)):
                     for yy in range(int(y0), int(y1)):
@@ -207,9 +208,14 @@ class RefineRunner:
                             mean += delta / float(n)
                             delta2 = v - mean
                             m2 += delta * delta2
+                            if v > vmax:
+                                vmax = float(v)
             if n <= 0:
-                return 0.0
-            return float(m2 / float(n))
+                return 0.0, 0.0, 0.0
+            var = float(m2 / float(n))
+            if vmax == float("-inf"):
+                vmax = 0.0
+            return float(mean), float(var), float(vmax)
 
         pressure: Dict[int, float] = {}
         for c in citations:
@@ -218,7 +224,8 @@ class RefineRunner:
 
         feats: List[TokenFeatures] = []
         for t in tokens:
-            var = _patch_variance(t)
+            x0, x1, y0, y1, z0, z1 = [float(x) for x in t.omega_box_mm]
+            mean_int, var, vmax = _patch_variance(t)
             feats.append(
                 TokenFeatures(
                     token_id=int(t.token_id),
@@ -227,6 +234,11 @@ class RefineRunner:
                     evidence_entropy=float(math.log1p(max(0.0, float(var)))),
                     citation_pressure=float(pressure.get(int(t.token_id), 0.0)),
                     history_splits=int(len(t.children_ids)),
+                    center_x_mm=float((x0 + x1) / 2.0),
+                    center_y_mm=float((y0 + y1) / 2.0),
+                    center_z_mm=float((z0 + z1) / 2.0),
+                    mean_intensity=float(mean_int),
+                    max_intensity=float(vmax),
                 )
             )
         return feats

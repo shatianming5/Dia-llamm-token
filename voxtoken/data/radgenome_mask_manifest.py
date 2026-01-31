@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import shutil
 import sys
@@ -44,6 +45,79 @@ def _normalize_mask_filename(mask: str) -> str:
     if s.lower().endswith(".nii.gz"):
         return s
     return f"{s}.nii.gz"
+
+def _is_gzip_file(path: Path) -> bool:
+    try:
+        with path.open("rb") as f:
+            return f.read(2) == b"\x1f\x8b"
+    except Exception:
+        return False
+
+
+class _ConcatReader(io.RawIOBase):
+    """
+    Read multiple file parts sequentially as one byte stream.
+
+    RadGenome-ChestCT ships anatomy masks as a gzip-compressed tar that is split into
+    files `train_anatomy_mask_aa`, `train_anatomy_mask_ab`, ... (like `split -b ...`).
+    Only the first part has a gzip header; the remaining parts are raw continuation
+    bytes and are not valid gzip files on their own.
+    """
+
+    def __init__(self, parts: List[Path]):
+        super().__init__()
+        self._parts = [Path(p) for p in parts]
+        self._idx = 0
+        self._fh = None
+
+    def readable(self) -> bool:  # noqa: D401
+        return True
+
+    def _open_next(self) -> bool:
+        if self._fh is not None:
+            try:
+                self._fh.close()
+            except Exception:
+                pass
+            self._fh = None
+        while self._idx < len(self._parts):
+            p = self._parts[self._idx]
+            self._idx += 1
+            if not p.exists():
+                continue
+            self._fh = p.open("rb")
+            return True
+        return False
+
+    def readinto(self, b: bytearray | memoryview) -> int:  # type: ignore[override]
+        if self.closed:
+            return 0
+        if self._fh is None and not self._open_next():
+            return 0
+
+        mv = memoryview(b)
+        n_total = 0
+        while n_total < len(mv):
+            if self._fh is None and not self._open_next():
+                break
+            try:
+                n = self._fh.readinto(mv[n_total:])  # type: ignore[union-attr]
+            except Exception:
+                n = 0
+            if not n:
+                if not self._open_next():
+                    break
+                continue
+            n_total += int(n)
+        return int(n_total)
+
+    def close(self) -> None:
+        try:
+            if self._fh is not None:
+                self._fh.close()
+        finally:
+            self._fh = None
+            super().close()
 
 
 def _target_shape_cdhw(cfg: Dict[str, Any]) -> List[int]:
@@ -302,9 +376,15 @@ def build_radgenome_mask_manifest(
         raise ValueError("--mask is required")
 
     dataset_dir = radgenome_root / "dataset"
-    archives = sorted([p for p in dataset_dir.glob("train_anatomy_mask_*") if p.is_file()])
-    if not archives:
-        raise FileNotFoundError(f"no train_anatomy_mask_* archives found under: {dataset_dir}")
+    parts = sorted([p for p in dataset_dir.glob("train_anatomy_mask_*") if p.is_file()])
+    if not parts:
+        raise FileNotFoundError(f"no train_anatomy_mask_* files found under: {dataset_dir}")
+
+    # RadGenome-ChestCT anatomy masks are typically provided as a single tar.gz split across
+    # `train_anatomy_mask_aa`, `train_anatomy_mask_ab`, ... where only the first part has
+    # a gzip header. Detect and read them as one concatenated stream.
+    use_concat = bool(len(parts) > 1 and _is_gzip_file(parts[0]) and all(not _is_gzip_file(p) for p in parts[1:]))
+    archive_groups: List[List[Path]] = [list(parts)] if use_concat else [[p] for p in parts]
 
     target_shape = _target_shape_cdhw(cfg)
     token_spacing_xyz_mm = _token_voxel_spacing_xyz_mm(cfg)
@@ -361,11 +441,16 @@ def build_radgenome_mask_manifest(
 
     # Scan the tar shards in order and accept the first cases we can resolve+extract,
     # to avoid seeking for specific case_ids (which would require scanning huge shards).
-    for archive in archives:
+    for group in archive_groups:
         if done():
             break
+        archive_label = "+".join([p.name for p in group]) if len(group) > 1 else group[0].name
         try:
-            with tarfile.open(str(archive), mode="r|gz") as tf:
+            if len(group) == 1:
+                tf_ctx = tarfile.open(str(group[0]), mode="r|gz")
+            else:
+                tf_ctx = tarfile.open(fileobj=_ConcatReader(group), mode="r|gz")
+            with tf_ctx as tf:
                 try:
                     for member in tf:
                         if done():
@@ -443,7 +528,7 @@ def build_radgenome_mask_manifest(
                                 ],
                                 "grounding_boxes_by_sent_mm": {"0": [[float(x) for x in box_mm]]},
                                 "radgenome_mask_member": str(name),
-                                "radgenome_mask_archive": str(archive),
+                                "radgenome_mask_archive": str(archive_label),
                                 "gt_source": "radgenome.chestct",
                                 "gt_is_pseudo": True,
                                 "coord_system": "token_space_mm",

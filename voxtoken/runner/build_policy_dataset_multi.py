@@ -127,11 +127,12 @@ def _token_feature_vector(
         x0 = max(0, min(int(x0), int(w)))
         x1 = max(0, min(int(x1), int(w)))
         if z1 <= z0 or y1 <= y0 or x1 <= x0:
-            return 0.0
+            return 0.0, 0.0, 0.0
 
         n = 0
         mean = 0.0
         m2 = 0.0
+        vmax = float("-inf")
         for cc in range(int(c)):
             for zz in range(int(z0), int(z1)):
                 for yy in range(int(y0), int(y1)):
@@ -143,16 +144,27 @@ def _token_feature_vector(
                         mean += delta / float(n)
                         delta2 = v - mean
                         m2 += delta * delta2
+                        if v > vmax:
+                            vmax = float(v)
         if n <= 0:
-            return 0.0
-        return float(m2 / float(n))
+            return 0.0, 0.0, 0.0
+        var = float(m2 / float(n))
+        if vmax == float("-inf"):
+            vmax = 0.0
+        return float(mean), float(var), float(vmax)
 
-    var = float(_patch_variance())
+    mean_int, var, vmax = _patch_variance()
+    x0, x1, y0, y1, z0, z1 = [float(x) for x in token.omega_box_mm]
     return {
         "recon_error": float(var),
         "evidence_entropy": float(math.log1p(max(0.0, float(var)))),
         "citation_pressure": 0.0,
         "history_splits": int(len(token.children_ids)),
+        "center_x_mm": float((x0 + x1) / 2.0),
+        "center_y_mm": float((y0 + y1) / 2.0),
+        "center_z_mm": float((z0 + z1) / 2.0),
+        "mean_intensity": float(mean_int),
+        "max_intensity": float(vmax),
     }
 
 
@@ -284,4 +296,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

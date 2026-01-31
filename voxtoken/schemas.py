@@ -83,6 +83,11 @@ class TokenFeatures:
     evidence_entropy: float
     citation_pressure: float
     history_splits: int
+    center_x_mm: float = 0.0
+    center_y_mm: float = 0.0
+    center_z_mm: float = 0.0
+    mean_intensity: float = 0.0
+    max_intensity: float = 0.0
 
 
 __all__ = [
@@ -97,4 +102,3 @@ __all__ = [
     "TokenFeatures",
     "TraceStep",
 ]
-
