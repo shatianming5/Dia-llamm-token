@@ -1,5 +1,5 @@
 # Proof Audit
-Generated at (UTC): `2026-01-31T16:46:00.339289+00:00`
+Generated at (UTC): `2026-01-31T17:32:09.422566+00:00`
 
 ## Inputs
 - plan: `docs/plan.md`
@@ -7,8 +7,8 @@ Generated at (UTC): `2026-01-31T16:46:00.339289+00:00`
 - results_dir: `.rd_queue/results`
 
 ## Summary
-- total_claims: **42**
-- proved: **42**
+- total_claims: **49**
+- proved: **49**
 - not_proved: **0**
 
 ## Claims
@@ -56,6 +56,13 @@ Generated at (UTC): `2026-01-31T16:46:00.339289+00:00`
 | C0040 | Verifier inconsistency rule detects plan-vs-report slot mismatches deterministically. | E0916 | Y/Y | Y/Y | PROVED |
 | C0041 | Inference refinement implements the marginal stop rule (ΔV/Δ\|T\| < tau) to stop early under no-improvement splits. | E0917 | Y/Y | Y/Y | PROVED |
 | C0042 | Constrained decoding removes overclaim sentences even if the generator attempts to add them. | E0918 | Y/Y | Y/Y | PROVED |
+| C0100 | Papertrack (pseudo-GT): TS lung_nodules case index + GT manifest can be built with non-empty GT boxes and deterministic splits. | E0911, E0912 | Y/Y | Y/Y | PROVED |
+| C0101 | Papertrack (pseudo-GT): policy dataset + policy training + benchmark + bootstrap improvement gate are runnable end-to-end. | E0913, E0914 | Y/Y | Y/Y | PROVED |
+| C0102 | Papertrack: export CI tables/plots from papertrack benchmark outputs deterministically. | E0915 | Y/Y | Y/Y | PROVED |
+| C0103 | CT-RATE valid ingest+preprocess yields a deterministic 70/30 train/val split over the available real volumes on this machine. | E0920, E0921 | Y/Y | Y/Y | PROVED |
+| C0104 | Effusion pseudo-GT manifests (pleural/pericardial) can be built from CT-RATE valid volumes + TotalSeg masks with non-empty GT boxes. | E0922, E0923 | Y/Y | Y/Y | PROVED |
+| C0105 | Effusion policy datasets (pleural/pericardial, split=train) can be built from GT boxes into a runnable dataset.jsonl. | E0924, E0925 | Y/Y | Y/Y | PROVED |
+| C0106 | Effusion policy training + grounding benchmark (split=val) runs fixed/heuristic/learned across budgets and emits non-empty metrics+summary. | E0926, E0927 | Y/Y | Y/Y | PROVED |
 
 ## Not Proved
 

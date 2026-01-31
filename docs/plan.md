@@ -148,6 +148,28 @@
   - Evidence: E0918
   - Proof rule: `python -m voxtoken.runner.validate_constrained_overclaim --out artifacts/e0918_constrained_overclaim` exits 0; the output report has no hallucinated finding and no `Issue(type="overclaim")`.
 
+- [x] C0100: Papertrack (pseudo-GT): TS lung_nodules case index + GT manifest can be built with non-empty GT boxes and deterministic splits.
+  - Evidence: E0911, E0912
+  - Proof rule: Run E0911 and E0912; both validators pass and write `cases.jsonl` / `manifest.jsonl` with existing `volume_path` + `gt_mask_path` and non-empty `grounding_boxes_by_sent_mm`.
+- [x] C0101: Papertrack (pseudo-GT): policy dataset + policy training + benchmark + bootstrap improvement gate are runnable end-to-end.
+  - Evidence: E0913, E0914
+  - Proof rule: Run E0913 and E0914; policy dataset validates, checkpoint validates, benchmark summary validates, and the bootstrap improvement gate passes.
+- [x] C0102: Papertrack: export CI tables/plots from papertrack benchmark outputs deterministically.
+  - Evidence: E0915
+  - Proof rule: Run E0915; validator confirms `table1_main_ci.csv` and `fig2_pareto_tokens_ci.png` exist.
+- [x] C0103: CT-RATE valid ingest+preprocess yields a deterministic 70/30 train/val split over the available real volumes on this machine.
+  - Evidence: E0920, E0921
+  - Proof rule: Run E0920 and E0921; raw+processed manifests validate and split counts are non-empty.
+- [x] C0104: Effusion pseudo-GT manifests (pleural/pericardial) can be built from CT-RATE valid volumes + TotalSeg masks with non-empty GT boxes.
+  - Evidence: E0922, E0923
+  - Proof rule: Run E0922 and E0923; every row has existing `gt_mask_path`, `gt_is_pseudo=true`, `coord_system=token_space_mm`, and non-empty GT boxes.
+- [x] C0105: Effusion policy datasets (pleural/pericardial, split=train) can be built from GT boxes into a runnable dataset.jsonl.
+  - Evidence: E0924, E0925
+  - Proof rule: Run E0924 and E0925; dataset validators pass with required feature keys and sufficient rows/cases.
+- [x] C0106: Effusion policy training + grounding benchmark (split=val) runs fixed/heuristic/learned across budgets and emits non-empty metrics+summary.
+  - Evidence: E0926, E0927
+  - Proof rule: Run E0926 and E0927; checkpoint validator passes and benchmark validator confirms required methods exist.
+
 ## Plan Items (P####)
 
 - [x] P0001: Provide a baseline smoke entrypoint that emits `run.json`/`summary.json` with stable schema.
