@@ -1,0 +1,10 @@
+# Train policy config (CT-RATE TS, real data) (E0908)
+
+run_id: E0908
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/ct_rate_policy_dataset_e0908/dataset.jsonl
+
+train:
+  ridge: 1.0e-6
+

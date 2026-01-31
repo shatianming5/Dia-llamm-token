@@ -1,0 +1,24 @@
+# Tau-stop refinement config (E0917)
+#
+# Goal: exercise the ΔV/Δ|T| < tau stopping rule in `infer_refine`.
+
+volume:
+  shape_cdhw: [1, 8, 8, 8]
+  seed: 0
+  pattern: noise
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 4
+    max_levels: 2
+
+refine:
+  max_rounds: 3
+  max_splits_per_round: 1
+  min_score_delta: 0.0
+  tau: 1e-6
+
+policy:
+  mode: heuristic
+

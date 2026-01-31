@@ -1,0 +1,20 @@
+# Policy training config (E0300)
+#
+# This repo is still "interfaces-only", so we train on synthetic data to produce a
+# deterministic checkpoint that can be loaded by inference.
+
+out_dir: outputs/train_policy
+run_id: E0300
+
+synth:
+  n_samples: 256
+  seed: 0
+  noise_std: 0.0
+  true_weights:
+    recon_error: 1.0
+    evidence_entropy: 0.5
+    citation_pressure: 0.2
+    history_splits: -1.0
+
+train:
+  ridge: 1.0e-6

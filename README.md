@@ -27,12 +27,12 @@
 
 ### 1.3 阶段性 Claims（M0/M1）
 
-> 可审计的 claims 与证据映射以 `docs/plan.md` 顶部的 **M0/M1 Claims & Evidence Map** 为准；对应可运行实验见 `docs/experiment.md`。
+> 可审计的 claims 与证据映射以 `docs/plan.md` 顶部的 `C####` 为准；对应可运行实验见 `docs/experiment.md` 的 `E####`。
 
-- **CLAIM-M0-1**：baseline smoke 可运行，并生成符合 results contract 的 `run.json`/`summary.json`
-- **CLAIM-M0-2**：unified eval 可运行，并生成符合 results contract 的 `metrics.json`/`metrics.jsonl`
-- **CLAIM-M1-1**：`infer_refine` 可运行，生成非空 report 且每句都有 citation
-- **CLAIM-M1-2**：`unified_eval` 可读取 `infer_refine` 的 `tokens_used/verifier_score`
+- **C0001**（legacy: `CLAIM-M0-1`）：baseline smoke 可运行，并生成符合 results contract 的 `run.json`/`summary.json`
+- **C0002**（legacy: `CLAIM-M0-2`）：unified eval 可运行，并生成符合 results contract 的 `metrics.json`/`metrics.jsonl`
+- **C0003**（legacy: `CLAIM-M1-1`）：`infer_refine` 可运行，生成非空 report 且每句都有 citation
+- **C0004**（legacy: `CLAIM-M1-2`）：`unified_eval` 可读取 `infer_refine` 的 `tokens_used/verifier_score`
 
 （Proposal-level 的研究命题/假设仍在 `docs/plan.md` 的 long-horizon 部分，当前不作为 M0 收敛判据。）
 

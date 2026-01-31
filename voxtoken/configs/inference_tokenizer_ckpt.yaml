@@ -1,0 +1,20 @@
+# Inference config: load trained tokenizer checkpoint (E0500)
+
+volume:
+  shape_cdhw: [1, 8, 8, 8]
+  seed: 0
+  pattern: gradient
+
+tokenizer:
+  checkpoint_path: outputs/train_tokenizer/E0500/checkpoint.json
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 4
+    max_levels: 1
+
+refine:
+  max_rounds: 0
+
+gates:
+  require_citations: true
+  enforce_plan_constraints: true

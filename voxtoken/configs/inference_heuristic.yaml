@@ -1,0 +1,23 @@
+# Heuristic refinement config (E0200)
+#
+# Goal: exercise the split/refine loop on a tiny dummy volume, producing a non-empty trace
+# while staying within the budget.
+
+volume:
+  shape_cdhw: [1, 8, 8, 8]
+  seed: 0
+  pattern: noise
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 4        # level-0 patch
+    max_levels: 2   # build level-0 and level-1 (split once)
+
+refine:
+  max_rounds: 1
+  max_splits_per_round: 1
+  min_score_delta: 0.0
+
+policy:
+  mode: heuristic

@@ -1,0 +1,24 @@
+# Ablation config: no-constrained + overclaim (E0401)
+
+volume:
+  shape_cdhw: [1, 8, 8, 8]
+  seed: 0
+  pattern: noise
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 4
+    max_levels: 1
+
+refine:
+  max_rounds: 0
+
+realizer:
+  emit_citations: true
+  overclaim_extra_sentence: true
+  overclaim_finding_type: hallucination
+
+gates:
+  require_citations: true
+  enforce_plan_constraints: false

@@ -1,0 +1,17 @@
+source: radgenome
+
+# If the real RadGenome root is unavailable on this machine, ingest falls back to a
+# synthetic RadGenome-like dataset that provides sentence->GT boxes (mm).
+radgenome_root: /data/radgenome_chestct
+
+out_dir: artifacts/radgenome_raw_e0900
+manifest_path: artifacts/radgenome_raw_e0900/manifest.jsonl
+
+num_cases: 10
+seed: 0
+
+# Tiny dummy volume spec (for GT box coordinates; inference uses dummy volume loader).
+shape_dhw: [8, 8, 8]
+voxel_spacing_mm: [1.0, 1.0, 1.0]
+patch: 4
+

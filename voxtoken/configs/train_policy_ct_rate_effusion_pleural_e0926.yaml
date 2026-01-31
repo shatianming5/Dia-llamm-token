@@ -1,0 +1,10 @@
+# Train policy config (CT-RATE effusions: pleural_effusion) (E0926)
+
+run_id: E0926
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/ct_rate_policy_dataset_pleural_e0924/dataset.jsonl
+
+train:
+  ridge: 1.0e-6
+

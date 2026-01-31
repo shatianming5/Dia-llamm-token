@@ -1,4 +1,8 @@
-# Plan（Moved）
+# Plan
 
-本仓库的主计划文档已移动到 `docs/plan.md`。
+> Canonical plan is `docs/plan.md`.
+>
+> This root `plan.md` is intentionally kept minimal to avoid copy drift. Edit `docs/plan.md` instead.
+
+See: `docs/plan.md`
 

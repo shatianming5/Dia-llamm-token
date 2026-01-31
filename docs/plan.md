@@ -1,22 +1,403 @@
+# Plan
+
+## Goals
+
+- Maintain an auditable, doc-driven closed loop for the repo skeleton (interfaces-only), with stable artifacts/metrics contracts.
+- Keep all *runnable commitments* in `C####`/`P####` (including M2/M3/M4 promoted from the proposal); the remaining long-horizon proposal content below stays as notes unless explicitly promoted.
+
+## Claims (C####)
+
+- [x] C0001: Baseline smoke runs and produces `run.json` + `summary.json` that conform to `docs/results_contract.md`.
+  - Evidence: E0000
+  - Proof rule: `python -m voxtoken.runner.smoke --out artifacts/smoke` exits 0 and writes the required files/keys.
+  - Notes: Legacy claim ID `CLAIM-M0-1`.
+- [x] C0002: Unified eval runs on baseline `run.json` and produces `metrics.json` + `metrics.jsonl` that conform to `docs/results_contract.md`.
+  - Evidence: E0001
+  - Proof rule: `python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artifacts/eval` exits 0 and writes the required files/keys.
+  - Notes: Legacy claim ID `CLAIM-M0-2`.
+- [x] C0003: `infer_refine` runs and produces a non-empty report where every sentence has citations.
+  - Evidence: E0100
+  - Proof rule: `python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16` exits 0; `artifacts/infer/run.json` has non-empty `report` and citations for every sentence.
+  - Notes: Legacy claim ID `CLAIM-M1-1`.
+- [x] C0004: Unified eval can read `tokens_used`/`verifier_score` from an `infer_refine` run and write them to `metrics.json(l)`.
+  - Evidence: E0101
+  - Proof rule: `python -m voxtoken.runner.unified_eval --in artifacts/infer/run.json --out artifacts/infer_eval` exits 0 and writes `tokens_used`/`verifier_score`.
+  - Notes: Legacy claim ID `CLAIM-M1-2`.
+- [x] C0005: Heuristic refinement (split) runs and produces a non-empty `trace` with at least one split, while staying within token budget.
+  - Evidence: E0200
+  - Proof rule: `python -m voxtoken.runner.infer_refine --out artifacts/e0200 --budget 16 --config voxtoken/configs/inference_heuristic.yaml` exits 0 and writes `run.json` with `trace[0].split_token_ids` non-empty and `tokens_used <= budget_B`.
+  - Notes: Implements backlog idea E0200 (heuristic split).
+- [x] C0006: Policy training produces a reusable checkpoint, and inference can load it to drive split scoring.
+  - Evidence: E0300
+  - Proof rule: `python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_e0300.yaml` writes `outputs/train_policy/E0300/checkpoint.json`, then `infer_refine` can run with that checkpoint and produce a valid `run.json`.
+  - Notes: Implements backlog idea E0300 (learned split policy scaffold).
+- [x] C0007: No-citation ablation produces measurable unsupported sentences (unsupported_rate > 0) under unified eval.
+  - Evidence: E0400
+  - Proof rule: Run `infer_refine` with citations disabled and then `unified_eval`; `unsupported_rate` in `metrics.json(l)` is > 0 (expected ~1.0 for this skeleton).
+  - Notes: Part of backlog idea E0400.
+- [x] C0008: No-constrained ablation allows overclaim and is penalized by the verifier (verifier_score decreases and overclaim issues appear).
+  - Evidence: E0401
+  - Proof rule: Run `infer_refine` with constraints disabled + overclaim enabled; `run.json` contains at least one `Issue(type=\"overclaim\")` and `verifier_score` is lower than the constrained baseline.
+  - Notes: Part of backlog idea E0400 (split into a dedicated experiment).
+- [x] C0009: Tokenizer training writes a deterministic checkpoint, and inference can load it to assign non-null token codes.
+  - Evidence: E0500
+  - Proof rule: `python -m voxtoken.runner.train_tokenizer --config voxtoken/configs/train_tokenizer_e0500.yaml` writes `outputs/train_tokenizer/E0500/checkpoint.json`, then `infer_refine` with that checkpoint writes `run.json` whose `meta.tokenizer.checkpoint_path` matches and `meta.tokenizer.codes_enabled=true`.
+  - Notes: Synthetic-only training for the repo skeleton (stdlib-only).
+- [x] C0010: Evidence head training writes a deterministic checkpoint, and inference can load it to change finding types based on token codes.
+  - Evidence: E0600
+  - Proof rule: `python -m voxtoken.runner.train_evidence --config voxtoken/configs/train_evidence_e0600.yaml` writes `outputs/train_evidence/E0600/checkpoint.json`, then inference with that checkpoint produces a report with >=2 distinct finding types.
+  - Notes: Synthetic-only training for the repo skeleton (stdlib-only).
+- [x] C0011: Unified eval computes `slot_f1` from `run.json` (plan vs extracted slots) and returns ~1.0 for constrained baseline inference.
+  - Evidence: E0700
+  - Proof rule: Run `infer_refine` (baseline) then `unified_eval`; `slot_f1 >= 0.99`.
+  - Notes: Replaces placeholder `slot_f1=0.0`.
+- [x] C0012: Inference records `latency_ms.total` in `run.json`, and unified eval propagates it to `metrics.latency_ms.total` (> 0).
+  - Evidence: E0701
+  - Proof rule: Run `infer_refine` then `unified_eval`; `metrics.latency_ms.total > 0`.
+- [x] C0013: `reproduce` can re-run an experiment by `E####` by parsing `docs/experiment.md` and executing its `1GPU script`.
+  - Evidence: E0800
+  - Proof rule: `python -m voxtoken.runner.reproduce --exp E0200` exits 0 and the underlying command chain completes successfully.
+- [x] C0014: Counterfactual evaluation can measure how `unsupported_rate` changes when citations are removed.
+  - Evidence: E0801
+  - Proof rule: Run E0801; the produced `counterfactuals.json` satisfies `remove_citations > base`.
+- [x] C0015: Data ingest + preprocess produces a processed manifest where every case has a deterministic `split` field.
+  - Evidence: E0802
+  - Proof rule: Run E0802; `manifest.jsonl` exists, has `n>=10`, and every row has a valid `split` in `{train,val,test}`.
+- [x] C0016: CT-RATE ingest+preprocess works from `/data/ct_rate` (or `/data/CT-RATE`) and produces a processed manifest with existing report/volume paths.
+  - Evidence: E0803
+  - Proof rule: Run E0803; `manifest.jsonl` exists, has `n>=20`, `report_path` and `volume_path` exist per row, and splits are valid.
+- [x] C0017: CT-RATE train split ingest+preprocess can produce a processed manifest with existing report paths (volume paths may be empty).
+  - Evidence: E0804
+  - Proof rule: Run E0804; `manifest.jsonl` exists, has `n>=200`, all `report_path` exist, and `case_id` starts with `train_`.
+- [x] C0018: `infer_refine` can run by selecting a case from a JSONL manifest and (when available) loading a small NIfTI volume.
+  - Evidence: E0805
+  - Proof rule: Run E0805; `run.json.meta.input` exists with `case_id` and `volume_loader=nifti`, and the run passes `validate_run`.
+- [x] C0019: `infer_refine` can also run on CT-RATE train manifests that have reports but no resolvable volumes (falls back to dummy volume).
+  - Evidence: E0806
+  - Proof rule: Run E0806; `run.json.meta.input` exists with `volume_loader=dummy`, report_path exists, and the run passes `validate_run`.
+- [x] C0020: Batch inference can run over multiple CT-RATE validation cases with real volumes and emit an aggregated `metrics.jsonl`.
+  - Evidence: E0810
+  - Proof rule: Run E0810; `artifacts/e0810/metrics.jsonl` exists with `n>=5` unique case_ids and all runs use `volume_loader=nifti`.
+- [x] C0021: Batch inference can run over the full CT-RATE validation manifest (all rows) when `--max-cases 0`.
+  - Evidence: E0811
+  - Proof rule: Run E0811; `artifacts/e0811/metrics.jsonl` exists with `n>=20` unique case_ids and all runs use `volume_loader=nifti`.
+- [x] C0022: CT-RATE ingest can join predicted multi-abnormality labels into the manifest (`labels_pos`).
+  - Evidence: E0820
+  - Proof rule: Run E0820; processed manifest has `labels_pos` and at least one row has non-empty labels.
+- [x] C0023: Label evaluation can compute per-case multi-label metrics (`precision/recall/f1`) from `run.json` + CT-RATE predicted labels.
+  - Evidence: E0821
+  - Proof rule: Run E0821; `label_metrics.json` exists and passes `validate_label_metrics` with `n_gold_pos > 0`.
+- [x] C0024: Batch label evaluation can produce `label_metrics.jsonl` for a CT-RATE subset.
+  - Evidence: E0822
+  - Proof rule: Run E0822; `label_metrics.jsonl` exists with `n>=20` and passes `validate_label_metrics_jsonl`.
+- [x] C0025: Label-conditioned report generation from CT-RATE `labels_pos` can achieve `f1>=0.99` on a labeled case.
+  - Evidence: E0830
+  - Proof rule: Run E0830; `label_metrics.json` passes `validate_label_metrics` with `n_gold_pos > 0` and `f1 >= 0.99`.
+- [x] C0026: Batch label-conditioned report generation from CT-RATE `labels_pos` can achieve `f1>=0.99` for at least 10 labeled cases.
+  - Evidence: E0831
+  - Proof rule: Run E0831; `label_metrics.jsonl` passes `validate_label_metrics_jsonl` with `n>=10` and per-row `f1 >= 0.99`.
+- [x] C0027: `infer_refine` writes sidecar artifacts (`final_report.txt`, `evidence_graph.json`, `trace.jsonl`) for paper-facing exports.
+  - Evidence: E0832
+  - Proof rule: Run E0832; sidecar files exist next to `run.json` and pass `validate_run` sidecar checks.
+- [x] C0028: Batch inference over 50 CT-RATE cases writes the full artifact bundle per case (run.json + report/evidence/trace sidecars).
+  - Evidence: E0833
+  - Proof rule: Run E0833; `metrics.jsonl` has `n>=50` and batch runner validates sidecar outputs per case.
+- [x] C0029: Counterfactual citation swap increases `unsupported_rate` when unsupported is defined as "citation does not support the slot".
+  - Evidence: E0834
+  - Proof rule: Run E0834; `validate_counterfactuals` passes with `citation_swap > base` and `remove_citations > base`.
+- [x] C0030: Grounding pipeline runs on RadGenome-synth and unified eval reports GT-based grounding metrics.
+  - Evidence: E0901
+  - Proof rule: Run E0901; `metrics.json` contains `ground_hit@0.0`, `ground_hit@0.1`, `ground_mean_iou` and the grounding overlay artifacts exist.
+- [x] C0031: Learned split policy beats heuristic on grounding (higher `ground_mean_iou` under the same budget) on RadGenome-synth.
+  - Evidence: E0902
+  - Proof rule: Run E0902; `validate_policy_improvement` (or equivalent gate) passes with `ground_mean_iou(learned) > ground_mean_iou(heuristic)`.
+- [x] C0032: Counterfactual causality holds on GT grounding: permuting Ω or swapping citations reduces grounding vs base deterministically.
+  - Evidence: E0903
+  - Proof rule: Run E0903; `validate_counterfactuals` passes grounding drop gates (permute_omega / swap_citations < base) on GT sentence boxes.
+- [x] C0033: Tokenizer training emits codebook-usage diagnostics (perplexity) and `recon_error` has sufficient dynamic range for split features.
+  - Evidence: E0904
+  - Proof rule: Run E0904; tokenizer metrics validate (`perplexity >= 2.0`) and `recon_error` separation validates on a structured dummy volume.
+  - Notes: Skeleton uses stdlib-only proxies (k-means on patch means; recon_error=patch variance).
+- [x] C0034: Evidence graph sidecar is traceable: every `EvidenceNode.supported_token_ids` maps to tokens with `omega_box_mm` inside `evidence_graph.json`.
+  - Evidence: E0905
+  - Proof rule: Run E0905; evidence graph validation passes and every evidence node is traceable to token boxes.
+- [x] C0035: Verifier is deterministic for the same input/config, and issues are localized to spans + related tokens/evidence.
+  - Evidence: E0906
+  - Proof rule: Run E0906; verifier stability validation passes comparing two runs on the same case.
+
+- [x] C0036: CT-RATE TS (lung nodules) grounding GT manifest can be built from real CT volumes + TS masks into a runnable per-case GT-box dataset.
+  - Evidence: E0907
+  - Proof rule: Run E0907; output `manifest.jsonl` exists with `n>=5`, every row has existing `volume_path` + `gt_mask_path`, and `grounding_boxes_by_sent_mm["0"]` is non-empty.
+- [x] C0037: Policy training can fit a split policy from CT-RATE TS grounding rewards and write a reusable checkpoint with non-default weights.
+  - Evidence: E0908
+  - Proof rule: Run E0908; `outputs/train_policy/E0908/checkpoint.json` exists and its `weights` differ from the heuristic defaults.
+- [x] C0038: CT-RATE TS grounding benchmark runs fixed/heuristic/learned tokenization across budgets and outputs per-case + aggregate metrics deterministically.
+  - Evidence: E0909
+  - Proof rule: Run E0909; `metrics.jsonl`/`summary.json` exist and include required keys (`method`, `budget_B`, `tokens_used`, `latency_ms.total`, `ground_mean_iou`, `ground_hit@0.1`).
+- [x] C0039: Paper export script generates Table1/2 and Fig2/3 artifacts from benchmark outputs deterministically.
+  - Evidence: E0910
+  - Proof rule: Run E0910; the CSV tables and figure files exist under `artifacts/paper_e0910/`.
+
+- [x] C0040: Verifier inconsistency rule detects plan-vs-report slot mismatches deterministically.
+  - Evidence: E0916
+  - Proof rule: `python -m voxtoken.runner.validate_inconsistency_rule` exits 0 and prints `{"ok": true}`.
+- [x] C0041: Inference refinement implements the marginal stop rule (ΔV/Δ|T| < tau) to stop early under no-improvement splits.
+  - Evidence: E0917
+  - Proof rule: `python -m voxtoken.runner.validate_tau_stop --out artifacts/e0917_tau_stop` exits 0 and writes a `run.json` whose `trace` stops before `max_rounds`.
+- [x] C0042: Constrained decoding removes overclaim sentences even if the generator attempts to add them.
+  - Evidence: E0918
+  - Proof rule: `python -m voxtoken.runner.validate_constrained_overclaim --out artifacts/e0918_constrained_overclaim` exits 0; the output report has no hallucinated finding and no `Issue(type="overclaim")`.
+
+## Plan Items (P####)
+
+- [x] P0001: Provide a baseline smoke entrypoint that emits `run.json`/`summary.json` with stable schema.
+  - Linked claims: C0001
+  - Definition of done: `python -m voxtoken.runner.smoke --out artifacts/smoke` writes `run.json`/`summary.json` per `docs/results_contract.md`.
+  - Verification: `python -m voxtoken.runner.smoke --out artifacts/smoke`
+  - Touchpoints: `voxtoken/runner/smoke.py`, `voxtoken/schemas.py`, `docs/results_contract.md`
+- [x] P0002: Provide a unified evaluation entrypoint that emits `metrics.json`/`metrics.jsonl` with stable schema.
+  - Linked claims: C0002, C0004
+  - Definition of done: `python -m voxtoken.runner.unified_eval ...` writes `metrics.json`/`metrics.jsonl` per `docs/results_contract.md`.
+  - Verification: `python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artifacts/eval`
+  - Touchpoints: `voxtoken/runner/unified_eval.py`, `docs/eval_protocol.md`, `docs/results_contract.md`
+- [x] P0003: Provide a minimal inference closed-loop entrypoint (`infer_refine`) that emits citations + verifier outputs.
+  - Linked claims: C0003, C0004
+  - Definition of done: `python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16` writes `run.json` containing a non-empty `report` and per-sentence `citations`, plus `tokens_used`/`verifier_score`.
+  - Verification: `python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16`
+  - Touchpoints: `voxtoken/runner/infer_refine.py`, `voxtoken/models/generator/*`, `voxtoken/verify/*`
+- [x] P0004: Implement hierarchical tokenizer + heuristic refinement (split) that records trace steps and respects budget.
+  - Linked claims: C0005
+  - Definition of done: `infer_refine` can run with `refine.max_rounds>0` and emits `trace` with non-empty split ids; token selection adds finer tokens without exceeding `budget_B`.
+  - Verification: `python -m voxtoken.runner.infer_refine --out artifacts/e0200 --budget 16 --config voxtoken/configs/inference_heuristic.yaml`
+  - Touchpoints: `voxtoken/models/tokenizer.py`, `voxtoken/runner/infer_refine.py`, `voxtoken/models/policy.py`
+- [x] P0005: Implement a minimal policy training loop that outputs a checkpoint and can be loaded for inference scoring.
+  - Linked claims: C0006
+  - Definition of done: `train_policy` writes `checkpoint.json` with learned weights; `SplitPolicy` can load it; inference run captures the effective weights in artifacts for audit.
+  - Verification: `python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_e0300.yaml`
+  - Touchpoints: `voxtoken/runner/train_policy.py`, `voxtoken/models/policy.py`, `voxtoken/runner/infer_refine.py`
+- [x] P0006: Add ablation toggles for citations/constraints and verifier rules to reflect unsupported/overclaim differences.
+  - Linked claims: C0007, C0008
+  - Definition of done: can disable citation emission and/or constraint enforcement via config; verifier reports unsupported/overclaim issues accordingly; unified eval reflects unsupported_rate changes.
+  - Verification: `python -m voxtoken.runner.infer_refine --out artifacts/e0400 --budget 16 --config voxtoken/configs/inference_no_citation.yaml`
+  - Touchpoints: `voxtoken/models/generator/*`, `voxtoken/verify/rules.py`, `voxtoken/runner/infer_refine.py`
+- [x] P0007: Implement tokenizer training + checkpoint loading, and expose token codes for downstream modules.
+  - Linked claims: C0009
+  - Definition of done: `train_tokenizer` writes deterministic checkpoint with codebook; `Tokenizer3D` can load it and assign `Token.code`.
+  - Verification: `python -m voxtoken.runner.train_tokenizer --config voxtoken/configs/train_tokenizer_e0500.yaml`
+  - Touchpoints: `voxtoken/runner/train_tokenizer.py`, `voxtoken/models/tokenizer.py`
+- [x] P0008: Implement evidence head training + checkpoint loading to produce non-trivial finding types in plans/reports.
+  - Linked claims: C0010
+  - Definition of done: `train_evidence` writes deterministic checkpoint mapping code->finding; `EvidenceHead` loads it and emits different `finding_type` values.
+  - Verification: `python -m voxtoken.runner.train_evidence --config voxtoken/configs/train_evidence_e0600.yaml`
+  - Touchpoints: `voxtoken/runner/train_evidence.py`, `voxtoken/models/evidence_head.py`, `voxtoken/models/generator/*`
+- [x] P0009: Implement `slot_f1` computation in unified eval using a stable slot extractor.
+  - Linked claims: C0011
+  - Definition of done: `unified_eval` outputs non-placeholder `slot_f1` (plan vs extracted slots) and passes `E0700` validation.
+  - Verification: `python -m voxtoken.runner.unified_eval --in artifacts/infer/run.json --out artifacts/infer_eval && python -m voxtoken.runner.validate_metrics --in artifacts/infer_eval/metrics.json --require-slot-f1-ge 0.99`
+  - Touchpoints: `voxtoken/runner/unified_eval.py`, `voxtoken/verify/extract_slots.py`
+- [x] P0010: Record inference latency in `run.json` and propagate to unified eval metrics.
+  - Linked claims: C0012
+  - Definition of done: `infer_refine` writes `latency_ms.total > 0`; `unified_eval` copies it to `metrics.latency_ms.total`.
+  - Verification: `python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16 --config voxtoken/configs/inference.yaml && python -m voxtoken.runner.unified_eval --in artifacts/infer/run.json --out artifacts/infer_eval && python -m voxtoken.runner.validate_metrics --in artifacts/infer_eval/metrics.json --require-latency-total-gt 0`
+  - Touchpoints: `voxtoken/runner/infer_refine.py`, `voxtoken/runner/unified_eval.py`
+- [x] P0011: Implement an experiment reproduction CLI that can re-run `E####` from `docs/experiment.md`.
+  - Linked claims: C0013
+  - Definition of done: `python -m voxtoken.runner.reproduce --exp E0200` locates the `1GPU script` command in the ledger and executes it (exit code 0).
+  - Verification: `python -m voxtoken.runner.reproduce --exp E0200`
+  - Touchpoints: `voxtoken/runner/reproduce.py`, `docs/experiment.md`
+- [x] P0012: Add counterfactual evaluation runner + validator (citation removal sensitivity).
+  - Linked claims: C0014
+  - Definition of done: can run counterfactual eval on a `run.json` and validate `remove_citations > base` deterministically.
+  - Verification: `python -m voxtoken.runner.counterfactual_eval --in artifacts/infer/run.json --out artifacts/cf_eval && python -m voxtoken.runner.validate_counterfactuals --in artifacts/cf_eval/counterfactuals.json --require-remove-citations-gt-base`
+  - Touchpoints: `voxtoken/eval/counterfactuals.py`, `voxtoken/runner/counterfactual_eval.py`, `voxtoken/runner/validate_counterfactuals.py`
+- [x] P0013: Add runnable ingest+preprocess configs and a manifest validator for deterministic splits.
+  - Linked claims: C0015
+  - Definition of done: `voxtoken.data.ingest` + `voxtoken.data.preprocess` can run from configs and `validate_manifest` confirms split fields.
+  - Verification: `python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_e0802.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_e0802.yaml && python -m voxtoken.runner.validate_manifest --in artifacts/data_proc_e0802/manifest.jsonl --require-n-ge 10 --valid-splits train val test`
+  - Touchpoints: `voxtoken/data/ingest.py`, `voxtoken/data/preprocess.py`, `voxtoken/runner/validate_manifest.py`, `voxtoken/configs/data_*_e0802.yaml`
+- [x] P0014: Extend data ingest to support CT-RATE reports and optional volume path resolution.
+  - Linked claims: C0016
+  - Definition of done: `voxtoken.data.ingest` supports `source: ct_rate` and can read CT-RATE CSVs under `/data/ct_rate` (fallback to `/data/CT-RATE`).
+  - Verification: `python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_e0803.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_e0803.yaml && python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_proc_e0803/manifest.jsonl --require-n-ge 20 --valid-splits train val test --require-report-path-exists --require-volume-path-exists --require-nonempty-volume-paths-ge 20`
+  - Touchpoints: `voxtoken/data/ingest.py`, `voxtoken/data/preprocess.py`, `voxtoken/runner/validate_manifest.py`, `voxtoken/configs/data_*_ct_rate_*.yaml`
+- [x] P0015: Add runnable CT-RATE train split ingest+preprocess configs and validate report-path existence.
+  - Linked claims: C0017
+  - Definition of done: can ingest CT-RATE train reports (subset) into a manifest + per-case report txt files, then preprocess and validate.
+  - Verification: `python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_train_e0804.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_train_e0804.yaml && python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_train_proc_e0804/manifest.jsonl --require-n-ge 200 --valid-splits train val test --require-report-path-exists --require-case-id-prefix train_`
+  - Touchpoints: `voxtoken/data/ingest.py`, `voxtoken/configs/data_ingest_ct_rate_train_e0804.yaml`, `voxtoken/configs/data_preprocess_ct_rate_train_e0804.yaml`, `voxtoken/runner/validate_manifest.py`
+- [x] P0016: Extend `infer_refine` to optionally select a case from a JSONL manifest and load small NIfTI volumes.
+  - Linked claims: C0018
+  - Definition of done: `infer_refine` supports `--manifest` + `--case-id`, records `meta.input`, and uses `volume_loader=nifti` when `volume_path` exists.
+  - Verification: `python -m voxtoken.runner.infer_refine --out artifacts/e0805 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --case-id valid_1_a_1 && python -m voxtoken.runner.validate_run --in artifacts/e0805/run.json --require-meta-input --require-meta-input-case-id valid_1_a_1 --require-meta-input-volume-loader nifti --require-meta-input-volume-path-exists`
+  - Touchpoints: `voxtoken/runner/infer_refine.py`, `voxtoken/runner/validate_run.py`, `docs/experiment.md`
+- [x] P0017: Add a runnable experiment for manifest-driven inference on CT-RATE train reports (volume fallback path).
+  - Linked claims: C0019
+  - Definition of done: `infer_refine` can run on a CT-RATE train manifest row where `volume_path` is empty, and still records `meta.input.report_path`.
+  - Verification: `python -m voxtoken.runner.infer_refine --out artifacts/e0806 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_train_proc_e0804/manifest.jsonl --case-id train_1_a_1 && python -m voxtoken.runner.validate_run --in artifacts/e0806/run.json --require-meta-input --require-meta-input-case-id train_1_a_1 --require-meta-input-volume-loader dummy --require-meta-input-report-path-exists`
+  - Touchpoints: `voxtoken/runner/infer_refine.py`, `docs/experiment.md`, `voxtoken/runner/validate_run.py`
+- [x] P0018: Add a batch runner to run `infer_refine` + `unified_eval` over a JSONL manifest and write aggregated metrics.
+  - Linked claims: C0020
+  - Definition of done: batch runner can select `n` cases from a manifest, run per-case inference/eval, and write `metrics.jsonl` at the top level.
+  - Verification: `python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --out artifacts/e0810 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 5 --require-volume-loader nifti && python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0810/metrics.jsonl --require-n-ge 5`
+  - Touchpoints: `voxtoken/runner/batch_infer_eval.py`, `voxtoken/runner/validate_metrics_jsonl.py`, `voxtoken/runner/infer_refine.py`, `voxtoken/runner/unified_eval.py`
+- [x] P0019: Add a scale-test experiment for the batch runner (run all selected rows from the manifest).
+  - Linked claims: C0021
+  - Definition of done: `--max-cases 0` runs every selected row and writes `metrics.jsonl` with expected row count.
+  - Verification: `python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_proc_e0803/manifest.jsonl --out artifacts/e0811 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 0 --require-volume-loader nifti && python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0811/metrics.jsonl --require-n-ge 20`
+  - Touchpoints: `voxtoken/runner/batch_infer_eval.py`, `docs/experiment.md`
+- [x] P0020: Extend CT-RATE ingest to optionally join predicted labels into the manifest and validate `labels_pos`.
+  - Linked claims: C0022
+  - Definition of done: ingest supports `include_predicted_labels: true` and `validate_manifest` can require `labels_pos` and non-empty counts.
+  - Verification: `python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_labeled_e0820.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_labeled_e0820.yaml && python -m voxtoken.runner.validate_manifest --in artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --require-n-ge 20 --valid-splits train val test --require-report-path-exists --require-volume-path-exists --require-nonempty-volume-paths-ge 20 --require-labels-pos --require-nonempty-labels-pos-ge 1`
+  - Touchpoints: `voxtoken/data/ingest.py`, `voxtoken/runner/validate_manifest.py`, `voxtoken/configs/data_*_e0820.yaml`
+- [x] P0021: Add CT-RATE per-case label evaluation runner + validator.
+  - Linked claims: C0023
+  - Definition of done: `ct_rate_label_eval` can compute metrics from `run.json` + manifest row and validation can gate on `n_gold_pos`.
+  - Verification: `python -m voxtoken.runner.infer_refine --out artifacts/e0821 --budget 16 --config voxtoken/configs/inference.yaml --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --case-id valid_1_a_1 && python -m voxtoken.runner.ct_rate_label_eval --run artifacts/e0821/run.json --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0821_label --case-id valid_1_a_1 && python -m voxtoken.runner.validate_label_metrics --in artifacts/e0821_label/label_metrics.json --require-n-gold-pos-gt 0`
+  - Touchpoints: `voxtoken/runner/ct_rate_label_eval.py`, `voxtoken/runner/validate_label_metrics.py`
+- [x] P0022: Add CT-RATE batch label evaluation runner + validator.
+  - Linked claims: C0024
+  - Definition of done: `batch_label_eval` can aggregate `label_metrics.jsonl` across multiple run.json files and validate its schema/size.
+  - Verification: `python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0822 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 0 --require-volume-loader nifti && python -m voxtoken.runner.batch_label_eval --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --runs artifacts/e0822/runs --out artifacts/e0822_label && python -m voxtoken.runner.validate_label_metrics_jsonl --in artifacts/e0822_label/label_metrics.jsonl --require-n-ge 20`
+  - Touchpoints: `voxtoken/runner/batch_label_eval.py`, `voxtoken/runner/validate_label_metrics_jsonl.py`, `docs/experiment.md`
+- [x] P0023: Add CT-RATE label-conditioned report generator from `labels_pos`.
+  - Linked claims: C0025
+  - Definition of done: `ct_rate_report_from_labels` can generate a `run.json` whose report lines include finding types derived from `labels_pos`, enabling near-perfect label F1 under `ct_rate_label_eval`.
+  - Verification: `python -m voxtoken.runner.ct_rate_report_from_labels --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --case-id valid_1_a_1 --out artifacts/e0830 && python -m voxtoken.runner.ct_rate_label_eval --run artifacts/e0830/run.json --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0830_label --case-id valid_1_a_1 && python -m voxtoken.runner.validate_label_metrics --in artifacts/e0830_label/label_metrics.json --require-n-gold-pos-gt 0 --require-f1-ge 0.99`
+  - Touchpoints: `voxtoken/runner/ct_rate_report_from_labels.py`, `voxtoken/runner/ct_rate_label_eval.py`, `voxtoken/runner/validate_label_metrics.py`
+- [x] P0024: Add batch label-conditioned report generation + JSONL validator thresholds.
+  - Linked claims: C0026
+  - Definition of done: `batch_ct_rate_report_from_labels` can emit `runs/<case_id>/run.json` for a labeled manifest subset; `validate_label_metrics_jsonl` can gate on per-row F1 thresholds.
+  - Verification: `python -m voxtoken.runner.batch_ct_rate_report_from_labels --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --out artifacts/e0831 --max-cases 0 && python -m voxtoken.runner.batch_label_eval --manifest artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --runs artifacts/e0831/runs --out artifacts/e0831_label && python -m voxtoken.runner.validate_label_metrics_jsonl --in artifacts/e0831_label/label_metrics.jsonl --require-n-ge 10 --require-f1-ge 0.99`
+  - Touchpoints: `voxtoken/runner/batch_ct_rate_report_from_labels.py`, `voxtoken/runner/validate_label_metrics_jsonl.py`, `docs/experiment.md`
+- [x] P0025: Add sidecar artifact outputs for `infer_refine` (report/evidence/trace).
+  - Linked claims: C0027
+  - Definition of done: `infer_refine` writes `final_report.txt`, `evidence_graph.json`, and `trace.jsonl` next to `run.json` for any run.
+  - Verification: `python -m voxtoken.runner.infer_refine --out artifacts/e0832 --budget 16 --config voxtoken/configs/inference.yaml && python -m voxtoken.runner.validate_run --in artifacts/e0832/run.json --require-final-report-txt --require-evidence-graph-json --require-trace-jsonl`
+  - Touchpoints: `voxtoken/runner/infer_refine.py`, `voxtoken/runner/validate_run.py`, `docs/experiment.md`
+- [x] P0026: Ensure batch inference outputs the full artifact bundle (including sidecars) for each case.
+  - Linked claims: C0028
+  - Definition of done: `batch_infer_eval` writes `runs/<case_id>/{run.json,final_report.txt,evidence_graph.json,trace.jsonl}` and gates failures via `validate_run`.
+  - Verification: `python -m voxtoken.runner.batch_infer_eval --manifest artifacts/ct_rate_train_proc_e0804/manifest.jsonl --out artifacts/e0833 --budget 16 --config voxtoken/configs/inference.yaml --max-cases 50 && python -m voxtoken.runner.validate_metrics_jsonl --in artifacts/e0833/metrics.jsonl --require-n-ge 50`
+  - Touchpoints: `voxtoken/runner/batch_infer_eval.py`, `voxtoken/runner/infer_refine.py`, `voxtoken/runner/validate_run.py`, `docs/experiment.md`
+- [x] P0027: Strengthen unsupported definition to be slot-supported (not just "has some citation").
+  - Linked claims: C0029
+  - Definition of done: `unsupported_rate` is measured as "missing citation OR cited tokens do not support the sentence slot"; counterfactual citation swap increases unsupported.
+  - Verification: `python -m voxtoken.runner.infer_refine --out artifacts/e0834 --budget 16 --config voxtoken/configs/inference_evidence_ckpt.yaml && python -m voxtoken.runner.counterfactual_eval --in artifacts/e0834/run.json --out artifacts/e0834_cf && python -m voxtoken.runner.validate_counterfactuals --in artifacts/e0834_cf/counterfactuals.json --require-citation-swap-gt-base --require-remove-citations-gt-base --require-base-le 0.01`
+  - Touchpoints: `voxtoken/verify/rules.py`, `voxtoken/runner/unified_eval.py`, `voxtoken/eval/counterfactuals.py`, `voxtoken/runner/validate_counterfactuals.py`, `docs/experiment.md`
+- [x] P0028: Add RadGenome(-synth) ingest+preprocess configs to enable grounding-subset experiments.
+  - Linked claims: C0030
+  - Definition of done: `voxtoken.data.ingest` can produce a RadGenome-synth manifest with per-sentence GT boxes and `preprocess` adds deterministic splits.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E0900`
+  - Touchpoints: `voxtoken/data/ingest.py`, `voxtoken/data/preprocess.py`, `voxtoken/runner/validate_manifest.py`, `docs/experiment.md`
+- [x] P0029: Add GT-backed grounding eval + visualization runners and wire unified eval to consume GT boxes.
+  - Linked claims: C0030
+  - Definition of done: Can run `unified_eval` / `grounding_eval` / `visualize_grounding` on a RadGenome-synth case and get the required metrics + overlay artifacts.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E0901`
+  - Touchpoints: `voxtoken/runner/unified_eval.py`, `voxtoken/runner/grounding_eval.py`, `voxtoken/eval/visualize_grounding.py`, `docs/results_contract.md`
+- [x] P0030: Make counterfactual eval use GT grounding targets (manifest/gt.json) and expose grounding-drop validator gates.
+  - Linked claims: C0032
+  - Definition of done: `counterfactual_eval` can read GT sentence boxes and `validate_counterfactuals` can gate grounding drops for `permute_omega` / `swap_citations`.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E0903`
+  - Touchpoints: `voxtoken/eval/counterfactuals.py`, `voxtoken/runner/counterfactual_eval.py`, `voxtoken/runner/validate_counterfactuals.py`
+- [x] P0031: Add a learned-policy-vs-heuristic experiment with a deterministic improvement gate on grounding.
+  - Linked claims: C0031
+  - Definition of done: Under the same budget, learned policy yields higher grounding metric than heuristic on RadGenome-synth, and the claim is enforced by a validator.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E0902`
+  - Touchpoints: `voxtoken/runner/train_policy.py`, `voxtoken/models/policy.py`, `voxtoken/runner/infer_refine.py`, `voxtoken/runner/unified_eval.py`, `docs/experiment.md`
+- [x] P0032: Add tokenizer diagnostics (perplexity) and a `recon_error` separation gate for split-feature sanity.
+  - Linked claims: C0033
+  - Definition of done: `train_tokenizer` writes codebook usage/perplexity metrics, and validators can gate `perplexity>=2.0` plus `recon_error` dynamic range on a structured dummy volume.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E0904`
+  - Touchpoints: `voxtoken/runner/train_tokenizer.py`, `voxtoken/runner/validate_tokenizer_train_metrics.py`, `voxtoken/runner/validate_recon_error_separation.py`, `docs/experiment.md`
+- [x] P0033: Make `evidence_graph.json` self-contained and validate evidence→token→Ω traceability.
+  - Linked claims: C0034
+  - Definition of done: `infer_refine` writes `evidence_graph.json` that includes token boxes (or a token index) so evidence nodes can be traced to `omega_box_mm`, and `validate_run` enforces the invariant.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E0905`
+  - Touchpoints: `voxtoken/runner/infer_refine.py`, `voxtoken/runner/validate_run.py`, `docs/experiment.md`
+- [x] P0034: Add a verifier stability validator and an experiment that gates determinism + issue localization.
+  - Linked claims: C0035
+  - Definition of done: Running inference twice on the same deterministic input yields identical verifier outputs (score + issues), and issues carry valid spans and related tokens/evidence references.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E0906`
+  - Touchpoints: `voxtoken/verify/rules.py`, `voxtoken/runner/infer_refine.py`, `voxtoken/runner/validate_verifier_stability.py`, `docs/experiment.md`
+
+- [x] P0035: Build a CT-RATE TS grounding manifest (join CT volumes + TS masks; derive GT boxes).
+  - Linked claims: C0036
+  - Definition of done: Provide a CLI that produces a manifest with `gt_mask_path` and `grounding_boxes_by_sent_mm` for sentence 0, derived from TS segmentation masks on real CT-RATE volumes.
+  - Verification: `python -m voxtoken.data.ct_rate_ts_manifest --in artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl --task lung_nodules --out artifacts/ct_rate_ts_nodule_gt_e0907 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 10 && python -m voxtoken.runner.validate_ct_rate_ts_manifest --in artifacts/ct_rate_ts_nodule_gt_e0907/manifest.jsonl --require-n-ge 5`
+  - Touchpoints: `voxtoken/data/ct_rate_ts_manifest.py`, `voxtoken/runner/infer_refine.py`
+- [x] P0036: Build a multi-case policy dataset from CT-RATE TS GT boxes and train a policy checkpoint.
+  - Linked claims: C0037
+  - Definition of done: Dataset builder writes `dataset.jsonl` with features+reward for multiple cases; `train_policy` can fit weights from it and write a checkpoint.
+  - Verification: `python -m voxtoken.runner.build_policy_dataset_multi --manifest artifacts/ct_rate_ts_nodule_gt_e0907/manifest.jsonl --out artifacts/ct_rate_policy_dataset_e0908/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 10 --split train && python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_ct_rate_ts_e0908.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0908/checkpoint.json --require-nondefault-weights`
+  - Touchpoints: `voxtoken/runner/build_policy_dataset_multi.py`, `voxtoken/runner/train_policy.py`, `voxtoken/models/policy.py`
+- [x] P0037: Add a CT-RATE TS grounding benchmark runner (tokenization vs GT boxes) with validators.
+  - Linked claims: C0038
+  - Definition of done: Benchmark runs fixed/heuristic/learned methods across budgets on a manifest, writes `metrics.jsonl` + `summary.json`, and a validator can gate required fields deterministically.
+  - Verification: `python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/ct_rate_ts_nodule_gt_e0907/manifest.jsonl --out artifacts/e0909 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 10 --policy-ckpt outputs/train_policy/E0908/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0909/summary.json --require-methods fixed heuristic learned`
+  - Touchpoints: `voxtoken/runner/ct_rate_grounding_benchmark.py`, `voxtoken/runner/validate_grounding_benchmark.py`
+- [x] P0038: Add a paper export helper that turns benchmark metrics into Table1/2 and Fig2/3.
+  - Linked claims: C0039
+  - Definition of done: CLI writes CSV tables + PNG/SVG figures from `metrics.jsonl`, with deterministic sorting.
+  - Verification: `python -m voxtoken.runner.paper_export --in artifacts/e0909/metrics.jsonl --out artifacts/paper_e0910 && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0910`
+  - Touchpoints: `voxtoken/runner/paper_export.py`, `eval/pareto.py`
+
+## Changelog
+
+- 2026-01-31: Promote “paper-grade” CT-RATE TS grounding benchmark into runnable commitments (`C0036–C0039` / `P0035–P0038`) and add experiments E0907–E0910.
+- 2026-01-31: Implemented + proved E0907–E0910 (CT-RATE TS GT manifest, policy dataset+training, grounding benchmark, and paper export).
+- 2026-01-31: Promote proposal acceptance checks (Stage T/E + A5 verifier stability) into runnable commitments (`C0033–C0035` / `P0032–P0034`) and prove them via E0904–E0906.
+- 2026-01-31: Unify the “repo skeleton” tree to match the canonical tokenizer layout (`voxtoken/models/tokenizer.py`), avoiding a conflicting `models/tokenizer/` subpackage sketch.
+- 2026-01-31: Fix section-10 repo skeleton code block indentation so the tree is copy-pastable and path-consistent.
+- 2026-01-30: Align docs with docs-spec stable IDs (`C####`/`P####`/`E####`) while preserving legacy IDs (`CLAIM-M*`, `EXP-*`) in notes.
+- 2026-01-30: Promote proposal-level M2/M3/M4 into runnable commitments (`C0030–C0032` / `P0028–P0031`) per user request, so they are tracked and proved via `docs/experiment.md`.
+- 2026-01-30: Implemented + proved E0900–E0903 (RadGenome-synth grounding pipeline, learned split policy > heuristic, and GT-based counterfactual grounding drops).
+- 2026-01-30: Verified M0/M1 commands locally: `smoke`, `unified_eval`, `infer_refine`, `infer_eval` (artifacts under `artifacts/`).
+- 2026-01-30: Added next backlog scope as explicit `C0005–C0008` / `P0004–P0006` for E0200/E0300/E0400 implementation (unchecked until proved).
+- 2026-01-30: Implemented + proved E0200/E0300/E0400/E0401 (see `.rd_queue/results/` and `docs/experiment.md` checkboxes).
+- 2026-01-30: Implemented + proved E0500/E0600 (synthetic train_tokenizer/train_evidence checkpoints + inference loading).
+- 2026-01-30: Implemented + proved E0700/E0701 (slot_f1 computation + latency propagation in unified eval).
+- 2026-01-30: Added next runnable scope E0800–E0802 (reproduce CLI, counterfactual eval, and data ingest/preprocess pipeline) (unchecked until proved).
+- 2026-01-30: Implemented + proved E0800–E0802 (see `.rd_queue/results/` and `docs/experiment.md` checkboxes).
+- 2026-01-30: Added CT-RATE data pipeline check (E0803) (unchecked until proved).
+- 2026-01-30: Implemented + proved E0803 (CT-RATE subset ingest/preprocess) (see `.rd_queue/results/E0803-*.json`).
+- 2026-01-30: Added next runnable scope E0804–E0805 (CT-RATE train split ingest + manifest-driven inference) (unchecked until proved).
+- 2026-01-30: Implemented + proved E0804–E0805 (see `.rd_queue/results/E0804-*.json` and `.rd_queue/results/E0805-*.json`).
+- 2026-01-30: Added E0806 (manifest-driven inference on CT-RATE train reports, dummy volume fallback) (unchecked until proved).
+- 2026-01-30: Implemented + proved E0806 (see `.rd_queue/results/E0806-*.json`).
+- 2026-01-30: Added E0810 (batch inference/eval over CT-RATE validation cases) (unchecked until proved).
+- 2026-01-30: Implemented + proved E0810 (see `.rd_queue/results/E0810-*.json`).
+- 2026-01-30: Added E0811 (batch runner scale test: run all selected validation rows) (unchecked until proved).
+- 2026-01-30: Implemented + proved E0811 (see `.rd_queue/results/E0811-*.json`).
+- 2026-01-30: Added E0820–E0822 (CT-RATE predicted labels join + label eval) (unchecked until proved).
+- 2026-01-30: Implemented + proved E0820–E0822 (see `.rd_queue/results/E0820-*.json`, `.rd_queue/results/E0821-*.json`, `.rd_queue/results/E0822-*.json`).
+- 2026-01-30: Added + proved E0830 (CT-RATE report from `labels_pos`, gated by `f1>=0.99`) (see `.rd_queue/results/E0830-*.json`).
+- 2026-01-30: Added + proved E0831 (batch CT-RATE report from `labels_pos`, JSONL validator supports `--require-f1-ge`) (see `.rd_queue/results/E0831-*.json`).
+- 2026-01-30: Added + proved E0832 (infer_refine sidecar artifacts: report/evidence/trace) (see `.rd_queue/results/E0832-*.json`).
+- 2026-01-30: Added + proved E0833 (batch 50-case artifact bundle for M0 scale check) (see `.rd_queue/results/E0833-*.json`).
+- 2026-01-30: Added + proved E0834 (slot-supported unsupported + citation-swap counterfactual gate) (see `.rd_queue/results/E0834-*.json`).
+
 ---
 
 # Repo Plan（M0）& Proposal（Long-horizon）
 
 本仓库当前阶段：**interfaces-only（M0）**。为了让 doc-driven 循环可终止、可审计，本文件在顶部新增 **M0 Claims & Evidence Map**：只有该小节中的 claims 会被视为“必须证明”的工程承诺；其余大段内容是 long-horizon proposal / 设计笔记（为后续研究与实现服务），**不作为当前收敛的阻塞项**。
 
+2026-01-30 更新：用户要求补齐 proposal-level 的 M2/M3/M4，因此已在顶部以 `C0030–C0032` / `P0028–P0031` 形式提升为可验证承诺；其余未提升内容仍作为笔记保留。
+
 ## M0 Claims & Evidence Map（收敛判据）
 
 | Claim ID | Claim（可验证陈述） | Evidence（在哪看） | Verify（命令） | Status |
 |---|---|---|---|---|
-| CLAIM-M0-1 | baseline smoke 可运行，并生成符合 results contract 的 `run.json`/`summary.json` | `docs/experiment.md` → EXP-0000；产物：`artifacts/smoke/` | `python -m voxtoken.runner.smoke --out artifacts/smoke` | PROVED |
-| CLAIM-M0-2 | unified eval 可运行，并生成符合 results contract 的 `metrics.json`/`metrics.jsonl` | `docs/experiment.md` → EXP-0001；产物：`artifacts/eval/` | `python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artifacts/eval` | PROVED |
+| CLAIM-M0-1 | baseline smoke 可运行，并生成符合 results contract 的 `run.json`/`summary.json` | `docs/experiment.md` → E0000（legacy: EXP-0000）；产物：`artifacts/smoke/` | `python -m voxtoken.runner.smoke --out artifacts/smoke` | PROVED |
+| CLAIM-M0-2 | unified eval 可运行，并生成符合 results contract 的 `metrics.json`/`metrics.jsonl` | `docs/experiment.md` → E0001（legacy: EXP-0001）；产物：`artifacts/eval/` | `python -m voxtoken.runner.unified_eval --in artifacts/smoke/run.json --out artifacts/eval` | PROVED |
 
 ## M1 Claims & Evidence Map（最小可运行推理闭环）
 
 | Claim ID | Claim（可验证陈述） | Evidence（在哪看） | Verify（命令） | Status |
 |---|---|---|---|---|
-| CLAIM-M1-1 | `infer_refine` 可运行，生成非空 report 且每句都有 citation | `docs/experiment.md` → EXP-0100；产物：`artifacts/infer/run.json` | `python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16` | PROVED |
-| CLAIM-M1-2 | `unified_eval` 可读取 `infer_refine` 的 `tokens_used/verifier_score` 并写入 `metrics.json(l)` | 产物：`artifacts/infer_eval/metrics.jsonl` | `python -m voxtoken.runner.unified_eval --in artifacts/infer/run.json --out artifacts/infer_eval` | PROVED |
+| CLAIM-M1-1 | `infer_refine` 可运行，生成非空 report 且每句都有 citation | `docs/experiment.md` → E0100（legacy: EXP-0100）；产物：`artifacts/infer/run.json` | `python -m voxtoken.runner.infer_refine --out artifacts/infer --budget 16` | PROVED |
+| CLAIM-M1-2 | `unified_eval` 可读取 `infer_refine` 的 `tokens_used/verifier_score` 并写入 `metrics.json(l)` | `docs/experiment.md` → E0101（legacy: EXP-0100）；产物：`artifacts/infer_eval/metrics.jsonl` | `python -m voxtoken.runner.unified_eval --in artifacts/infer/run.json --out artifacts/infer_eval` | PROVED |
 
 ## M0 Contracts（契约/协议）
 
@@ -1486,7 +1867,7 @@ RadGenome 提供“句子对应 region mask”的直接评测通道。([Nature][
 
 （与当前 draft 类似，但脚本接口固定为“产物驱动评测”）
 
-```
+```text
 voxtoken/
   configs/
   data/
@@ -1497,10 +1878,9 @@ voxtoken/
     schemas.py          # Token/Evidence/Trace dataclasses
     geometry.py         # grid<->box(mm) mapping
   models/
-    tokenizer/
-      encoder3d.py
-      quantizer.py
-      tokenizer3d.py
+    encoder3d.py
+    vq.py
+    tokenizer.py        # hierarchical tokens + omega mapping
     evidence_head.py
     policy.py
   generation/

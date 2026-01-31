@@ -1,0 +1,13 @@
+# Data preprocess config (E0802)
+
+in_manifest: artifacts/data_raw_e0802/manifest.jsonl
+
+out_dir: artifacts/data_proc_e0802
+out_manifest: artifacts/data_proc_e0802/manifest.jsonl
+
+seed: 42
+split:
+  train: 0.8
+  val: 0.1
+  test: 0.1
+

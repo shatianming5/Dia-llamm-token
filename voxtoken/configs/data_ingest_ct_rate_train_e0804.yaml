@@ -1,0 +1,19 @@
+# Data ingest config (CT-RATE train reports subset) (E0804)
+
+source: ct_rate
+ct_rate_root: /data/ct_rate
+
+split: train
+num_cases: 200
+seed: 0
+
+out_dir: artifacts/ct_rate_train_raw_e0804
+manifest_path: artifacts/ct_rate_train_raw_e0804/manifest.jsonl
+
+# Train volumes are not available in this local mirror; ingest reports only.
+prefer_resolved_volume: false
+
+report_fields:
+  - Findings_EN
+  - Impressions_EN
+

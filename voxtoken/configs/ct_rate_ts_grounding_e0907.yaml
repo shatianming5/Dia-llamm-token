@@ -1,0 +1,53 @@
+# CT-RATE TS grounding benchmark config (paper-grade, real data) (E0907+)
+#
+# This config controls:
+# - how we downsample CT volumes/masks (volume.target_shape_cdhw),
+# - how we build hierarchical tokens (tokenizer.grid.{patch,max_levels}),
+# - and how the heuristic policy scores candidate splits (policy.weights).
+
+volume:
+  # Keep it tiny so the repo-skeleton loop remains CPU-friendly.
+  target_shape_cdhw: [1, 16, 16, 16]
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 8
+    max_levels: 3
+
+refine:
+  max_rounds: 2
+  max_splits_per_round: 4
+
+policy:
+  mode: heuristic
+  weights:
+    recon_error: 1.0
+    evidence_entropy: 1.0
+    citation_pressure: 0.0
+    history_splits: -1.0
+
+totalseg:
+  # Path contains per-volume `*.candidates.json` produced by a TotalSegmentator batch.
+  candidates_total_dir: /data/totalseg_outputs/ct_rate_valid_total_fastest_ml_run1/candidates_total
+
+  task_defs:
+    lung_nodules:
+      # Fallback proxy for "lung_nodules" if ts_seg is unavailable: use lung lobe structures.
+      structures:
+        - lung_upper_lobe_right
+        - lung_upper_lobe_left
+        - lung_lower_lobe_left
+        - lung_lower_lobe_right
+        - lung_middle_lobe_right
+
+# Preferred GT source (on this machine): voxel masks + bbox metadata produced by TotalSegmentator lung_nodules task.
+ts_seg:
+  lung_nodules:
+    metadata_csv: /data/tiasha/CT-RATE/dataset/ts_seg/ts_lung_nodules/valid_metadata.csv
+    masks_root: /data/tiasha/CT-RATE/dataset/ts_seg/ts_lung_nodules/valid_fixed
+
+# Additional explicit-mask GT source (on this machine): TotalSegmentator pleural/pericard effusion task outputs.
+effusions:
+  candidates_csv: /data/totalseg_outputs/ct_rate_valid_pleural_pericard_effusion_run1/candidates_effusions/pleural_pericard_effusion_candidates.csv
+  masks_root: /data/totalseg_outputs/ct_rate_valid_pleural_pericard_effusion_run1

@@ -1,0 +1,20 @@
+source: radgenome
+
+# Synthetic fallback is used when this root is not present.
+radgenome_root: /data/radgenome_chestct
+
+out_dir: artifacts/radgenome_raw_e0902
+manifest_path: artifacts/radgenome_raw_e0902/manifest.jsonl
+
+num_cases: 1
+seed: 0
+
+# Larger shape + coarser patch so a single split can improve IoU vs child-GT.
+shape_dhw: [16, 16, 16]
+voxel_spacing_mm: [1.0, 1.0, 1.0]
+patch: 8
+
+# Non-trivial GT: odd sentences use an aligned child box; even sentences use an x-shifted child box.
+gt_mode: mixed_child
+gt_shift_vox: 2
+

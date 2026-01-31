@@ -1,0 +1,23 @@
+# Learned policy refinement config (E0300)
+#
+# Uses the deterministic checkpoint produced by `train_policy_e0300.yaml`.
+
+volume:
+  shape_cdhw: [1, 8, 8, 8]
+  seed: 0
+  pattern: noise
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 4
+    max_levels: 2
+
+refine:
+  max_rounds: 1
+  max_splits_per_round: 1
+  min_score_delta: 0.0
+
+policy:
+  mode: learned
+  checkpoint_path: outputs/train_policy/E0300/checkpoint.json

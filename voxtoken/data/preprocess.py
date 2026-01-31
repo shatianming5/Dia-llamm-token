@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
+from .splits import assign_split as assign_split_deterministic
+
 
 def preprocess(cfg: Dict[str, Any]) -> None:
     """Preprocess volumes/reports (resample, windowing, caching, splits)."""
@@ -20,20 +22,11 @@ def preprocess(cfg: Dict[str, Any]) -> None:
 
     lines_in = [line for line in in_manifest.read_text(encoding="utf-8").splitlines() if line.strip()]
 
-    def assign_split(case_id: str) -> str:
-        h = sum((i + 1) * ord(ch) for i, ch in enumerate(case_id)) + int(seed)
-        r = (h % 1000) / 1000.0
-        if r < train_p:
-            return "train"
-        if r < (train_p + val_p):
-            return "val"
-        return "test"
-
     out_lines = []
     for line in lines_in:
         row = json.loads(line)
         case_id = str(row.get("case_id", ""))
-        row["split"] = assign_split(case_id)
+        row["split"] = assign_split_deterministic(case_id, seed=int(seed), train_p=float(train_p), val_p=float(val_p))
         out_lines.append(json.dumps(row, ensure_ascii=False))
 
     out_manifest = Path(str(cfg.get("out_manifest", out_dir / "manifest.jsonl")))

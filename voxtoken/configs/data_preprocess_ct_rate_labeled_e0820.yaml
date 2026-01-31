@@ -1,0 +1,13 @@
+# Data preprocess config (CT-RATE labeled subset) (E0820)
+
+in_manifest: artifacts/ct_rate_labeled_raw_e0820/manifest.jsonl
+
+out_dir: artifacts/ct_rate_labeled_proc_e0820
+out_manifest: artifacts/ct_rate_labeled_proc_e0820/manifest.jsonl
+
+seed: 42
+split:
+  train: 0.8
+  val: 0.1
+  test: 0.1
+

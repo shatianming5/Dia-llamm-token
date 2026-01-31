@@ -1,0 +1,15 @@
+# Evidence head training config (E0600)
+#
+# Stdlib-only synthetic "training": define a deterministic mapping from token code -> finding type.
+
+out_dir: outputs/train_evidence
+run_id: E0600
+
+# Uses the tokenizer codebook size (k) if available.
+tokenizer_checkpoint_path: outputs/train_tokenizer/E0500/checkpoint.json
+
+mapping:
+  label_low: normal
+  label_high: nodule
+  # default: k//2
+  threshold: 2

@@ -1,0 +1,10 @@
+# Train policy config (CT-RATE TS lung_nodules, pseudo-GT paper track) (E0914)
+
+run_id: E0914
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/ct_rate_policy_dataset_paper_e0913/dataset.jsonl
+
+train:
+  ridge: 1.0e-6
+

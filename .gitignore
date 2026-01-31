@@ -10,7 +10,10 @@ artifacts/
 outputs/
 checkpoints/
 runs/
-data/
+/data/
+.rd_queue/logs/
+.rd_queue/results/
+.rd_queue/queue.json
 
 .DS_Store
 Thumbs.db

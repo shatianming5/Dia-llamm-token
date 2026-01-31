@@ -1,0 +1,7 @@
+out_dir: outputs/train_policy
+run_id: E0902
+
+train:
+  ridge: 1.0e-6
+  dataset_jsonl: artifacts/e0902_policy/dataset.jsonl
+

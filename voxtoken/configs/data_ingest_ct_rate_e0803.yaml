@@ -1,0 +1,27 @@
+# Data ingest config (CT-RATE subset) (E0803)
+#
+# NOTE: This points at the local CT-RATE mirror. Some machines mount it as
+# /data/CT-RATE; users sometimes refer to /data/ct_rate. The ingest code
+# handles the /data/ct_rate -> /data/CT-RATE fallback.
+
+source: ct_rate
+ct_rate_root: /data/ct_rate
+
+# Use validation split so a small subset of .nii.gz exists under dataset/ts_seg.
+split: validation
+num_cases: 20
+seed: 0
+
+# Write a normalized manifest + per-case report txt files.
+out_dir: artifacts/ct_rate_raw_e0803
+manifest_path: artifacts/ct_rate_raw_e0803/manifest.jsonl
+
+# Prefer cases with a resolvable volume path, and only scan a small subtree.
+prefer_resolved_volume: true
+volume_search_roots:
+  - dataset/ts_seg
+
+report_fields:
+  - Findings_EN
+  - Impressions_EN
+

@@ -21,6 +21,9 @@
 - `budget_B`：推理 token 预算
 - `tokens_used`：实际使用 token 数
 - `verifier_score`：最终 verifier 分数（与 `metrics.json(l)` 对齐）
+- `meta`：审计信息（例如：policy/tokenizer/evidence 的 checkpoint 路径与参数快照）
+- `tokens`：本次推理实际使用的 token 列表（建议仅保存被选中的 tokens；未来大规模运行可选择不落盘或只落盘摘要）
+- `latency_ms`：推理耗时（毫秒），例如 `{tokenize, generate, verify, total}`（后续实现时应确保可复现的计时口径）
 
 ## 2) `metrics.json` / `metrics.jsonl`（统一评测输出）
 
@@ -31,9 +34,19 @@
   "case_id": "string",
   "budget_B": 1024,
   "tokens_used": 0,
+  "tokens_final": 0,
   "latency_ms": {"total": 0.0},
+  "lat_total_ms": 0.0,
   "slot_f1": 0.0,
+  "slot_f1_micro": 0.0,
+  "ground_hit@0.0": 0.0,
+  "ground_hit@0.1": 0.0,
+  "ground_mean_iou": 0.0,
   "unsupported_rate": 0.0,
+  "unsupported_sent_pct": 0.0,
+  "overclaim_sent_pct": 0.0,
+  "missing_slot_per_report": 0,
+  "inconsistency_per_report": 0,
   "verifier_score": 0.0
 }
 ```

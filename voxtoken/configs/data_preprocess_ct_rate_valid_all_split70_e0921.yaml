@@ -1,0 +1,12 @@
+# Data preprocess config (CT-RATE valid subset -> deterministic split 70/30) (E0921)
+
+in_manifest: artifacts/ct_rate_raw_valid_all_e0920/manifest.jsonl
+out_dir: artifacts/ct_rate_processed_valid_all_e0921
+out_manifest: artifacts/ct_rate_processed_valid_all_e0921/manifest.jsonl
+
+seed: 0
+split:
+  train: 0.7
+  val: 0.3
+  test: 0.0
+

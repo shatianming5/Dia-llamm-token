@@ -1,0 +1,8 @@
+# Data ingest config (E0802)
+#
+# This repo uses a tiny synthetic dataset so the closed loop is runnable on CPU.
+
+out_dir: artifacts/data_raw_e0802
+num_cases: 10
+manifest_path: artifacts/data_raw_e0802/manifest.jsonl
+

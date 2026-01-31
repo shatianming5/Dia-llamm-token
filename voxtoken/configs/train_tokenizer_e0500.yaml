@@ -1,0 +1,20 @@
+# Tokenizer training config (E0500)
+#
+# Stdlib-only synthetic "training" that fits a small 1D codebook on patch means.
+
+out_dir: outputs/train_tokenizer
+run_id: E0500
+
+synth:
+  shape_cdhw: [1, 8, 8, 8]
+  n_samples: 16
+  seed: 0
+  pattern: gradient
+
+tokenizer:
+  grid:
+    patch: 4
+
+codebook:
+  k: 4
+  iters: 8

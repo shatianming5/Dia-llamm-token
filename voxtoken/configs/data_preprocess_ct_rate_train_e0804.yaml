@@ -1,0 +1,13 @@
+# Data preprocess config (CT-RATE train reports subset) (E0804)
+
+in_manifest: artifacts/ct_rate_train_raw_e0804/manifest.jsonl
+
+out_dir: artifacts/ct_rate_train_proc_e0804
+out_manifest: artifacts/ct_rate_train_proc_e0804/manifest.jsonl
+
+seed: 42
+split:
+  train: 0.8
+  val: 0.1
+  test: 0.1
+

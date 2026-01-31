@@ -1,0 +1,10 @@
+# Train policy config (CT-RATE effusions: pericardial_effusion) (E0927)
+
+run_id: E0927
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/ct_rate_policy_dataset_pericardial_e0925/dataset.jsonl
+
+train:
+  ridge: 1.0e-6
+

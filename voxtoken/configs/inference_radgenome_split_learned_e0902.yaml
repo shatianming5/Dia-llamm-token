@@ -1,0 +1,25 @@
+volume:
+  target_shape_cdhw: [1, 16, 16, 16]
+  pattern: region_noise
+  region_patch: 8
+  high_scale: 1.0
+  low_scale: 0.01
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 8
+    max_levels: 2
+
+planner:
+  max_facts: 8
+
+refine:
+  max_rounds: 1
+  max_splits_per_round: 1
+  min_score_delta: 0.0
+
+policy:
+  mode: learned
+  checkpoint_path: outputs/train_policy/E0902/checkpoint.json
+
