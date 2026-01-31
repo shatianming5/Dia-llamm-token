@@ -1,0 +1,31 @@
+[
+  {
+    "id": "E0928",
+    "stage": "smoke",
+    "name": "Paper export (pleural_effusion benchmark)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0926_benchmark_pleural/metrics.jsonl --out artifacts/paper_e0928_pleural && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0928_pleural",
+    "workdir": "."
+  },
+  {
+    "id": "E0928",
+    "stage": "full",
+    "name": "Paper export (pleural_effusion benchmark) (full==smoke)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0926_benchmark_pleural/metrics.jsonl --out artifacts/paper_e0928_pleural && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0928_pleural",
+    "workdir": "."
+  },
+  {
+    "id": "E0929",
+    "stage": "smoke",
+    "name": "Paper export (pericardial_effusion benchmark)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0927_benchmark_pericardial/metrics.jsonl --out artifacts/paper_e0929_pericardial && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0929_pericardial",
+    "workdir": "."
+  },
+  {
+    "id": "E0929",
+    "stage": "full",
+    "name": "Paper export (pericardial_effusion benchmark) (full==smoke)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0927_benchmark_pericardial/metrics.jsonl --out artifacts/paper_e0929_pericardial && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0929_pericardial",
+    "workdir": "."
+  }
+]
+
