@@ -1,0 +1,45 @@
+[
+  {
+    "id": "E0930",
+    "stage": "smoke",
+    "name": "RadGenome-ChestCT ingest+preprocess (subset)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.runner.validate_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --require-n-ge 10 --valid-splits train val test --require-report-path-exists --require-volume-path-exists --require-nonempty-volume-paths-ge 10 --require-case-id-prefix train_",
+    "workdir": "."
+  },
+  {
+    "id": "E0930",
+    "stage": "full",
+    "name": "RadGenome-ChestCT ingest+preprocess (full==smoke)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.runner.validate_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --require-n-ge 10 --valid-splits train val test --require-report-path-exists --require-volume-path-exists --require-nonempty-volume-paths-ge 10 --require-case-id-prefix train_",
+    "workdir": "."
+  },
+  {
+    "id": "E0931",
+    "stage": "smoke",
+    "name": "Build GT manifest from RadGenome masks (lung effusion)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.radgenome_mask_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --out artifacts/radgenome_gt_lung_effusion_e0931 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --radgenome-root /data/tiasha/RadGenome-ChestCT --mask \"lung effusion\" --max-cases-train 20 --max-cases-val 5 --max-cases-test 0 && python -m voxtoken.runner.validate_ct_rate_ts_manifest --in artifacts/radgenome_gt_lung_effusion_e0931/manifest.jsonl --require-n-ge 5 --require-gt-is-pseudo --require-coord-system token_space_mm && python -m voxtoken.runner.validate_split_counts --in artifacts/radgenome_gt_lung_effusion_e0931/manifest.jsonl --require-train-ge 1 --require-val-ge 1",
+    "workdir": "."
+  },
+  {
+    "id": "E0931",
+    "stage": "full",
+    "name": "Build GT manifest from RadGenome masks (lung effusion) (full==smoke)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.radgenome_mask_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --out artifacts/radgenome_gt_lung_effusion_e0931 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --radgenome-root /data/tiasha/RadGenome-ChestCT --mask \"lung effusion\" --max-cases-train 20 --max-cases-val 5 --max-cases-test 0 && python -m voxtoken.runner.validate_ct_rate_ts_manifest --in artifacts/radgenome_gt_lung_effusion_e0931/manifest.jsonl --require-n-ge 5 --require-gt-is-pseudo --require-coord-system token_space_mm && python -m voxtoken.runner.validate_split_counts --in artifacts/radgenome_gt_lung_effusion_e0931/manifest.jsonl --require-train-ge 1 --require-val-ge 1",
+    "workdir": "."
+  },
+  {
+    "id": "E0932",
+    "stage": "smoke",
+    "name": "Train policy + benchmark (RadGenome lung effusion)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.radgenome_mask_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --out artifacts/radgenome_gt_lung_effusion_e0931 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --radgenome-root /data/tiasha/RadGenome-ChestCT --mask \"lung effusion\" --max-cases-train 20 --max-cases-val 5 --max-cases-test 0 && python -m voxtoken.runner.build_policy_dataset_multi --manifest artifacts/radgenome_gt_lung_effusion_e0931/manifest.jsonl --out artifacts/radgenome_policy_dataset_lung_effusion_e0932/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 0 --split train && python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_radgenome_lung_effusion_e0932.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0932/checkpoint.json --require-nondefault-weights && python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_effusion_e0931/manifest.jsonl --out artifacts/e0932_benchmark_radgenome_lung_effusion --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 --max-cases 5 --split val --policy-ckpt outputs/train_policy/E0932/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0932_benchmark_radgenome_lung_effusion/summary.json --require-methods fixed heuristic learned",
+    "workdir": "."
+  },
+  {
+    "id": "E0932",
+    "stage": "full",
+    "name": "Train policy + benchmark (RadGenome lung effusion)",
+    "command": "python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml && python -m voxtoken.data.radgenome_mask_manifest --in artifacts/radgenome_proc_e0930/manifest.jsonl --out artifacts/radgenome_gt_lung_effusion_e0931 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --radgenome-root /data/tiasha/RadGenome-ChestCT --mask \"lung effusion\" --max-cases-train 20 --max-cases-val 5 --max-cases-test 0 && python -m voxtoken.runner.build_policy_dataset_multi --manifest artifacts/radgenome_gt_lung_effusion_e0931/manifest.jsonl --out artifacts/radgenome_policy_dataset_lung_effusion_e0932/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --max-cases 0 --split train && python -m voxtoken.runner.train_policy --config voxtoken/configs/train_policy_radgenome_lung_effusion_e0932.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0932/checkpoint.json --require-nondefault-weights && python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_effusion_e0931/manifest.jsonl --out artifacts/e0932_benchmark_radgenome_lung_effusion --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 0 --split val --policy-ckpt outputs/train_policy/E0932/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0932_benchmark_radgenome_lung_effusion/summary.json --require-methods fixed heuristic learned",
+    "workdir": "."
+  }
+]
+

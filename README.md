@@ -115,6 +115,19 @@ data/
 # 例：CT-RATE valid volumes（当前机器有 38 个可解析 .nii.gz），deterministic 70/30 train/val
 python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_ct_rate_valid_all_e0920.yaml
 python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_ct_rate_valid_all_split70_e0921.yaml
+
+# 例：RadGenome-ChestCT（本机路径 /data/tiasha/RadGenome-ChestCT），仅做 volumes 子集 ingest + train/val split
+python -m voxtoken.data.ingest --config voxtoken/configs/data_ingest_radgenome_chestct_train_e0930.yaml
+python -m voxtoken.data.preprocess --config voxtoken/configs/data_preprocess_radgenome_chestct_train_e0930.yaml
+
+# 例：从 RadGenome anatomy masks 构建 GT-box manifest（会从 train_anatomy_mask_* 里按需解压单个 mask 到 artifacts/）
+python -m voxtoken.data.radgenome_mask_manifest \\
+  --in artifacts/radgenome_proc_e0930/manifest.jsonl \\
+  --out artifacts/radgenome_gt_lung_effusion_e0931 \\
+  --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml \\
+  --radgenome-root /data/tiasha/RadGenome-ChestCT \\
+  --mask "lung effusion" \\
+  --max-cases-train 20 --max-cases-val 5 --max-cases-test 0
 ```
 
 ### 4.4 split 与 seed（对齐 plan）

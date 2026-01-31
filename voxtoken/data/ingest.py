@@ -297,6 +297,9 @@ def _ingest_radgenome(cfg: Dict[str, Any]) -> None:
     seed = int(cfg.get("seed", 0))
     manifest_path = Path(str(cfg.get("manifest_path", out_dir / "manifest.jsonl")))
 
+    split = str(cfg.get("split", "train")).strip().lower()
+    use_region_report = bool(cfg.get("use_region_report", False))
+
     shape_dhw = cfg.get("shape_dhw") or cfg.get("shape") or [8, 8, 8]
     try:
         d, h, w = [int(x) for x in shape_dhw]
@@ -328,6 +331,88 @@ def _ingest_radgenome(cfg: Dict[str, Any]) -> None:
                     lines.append(line.strip())
             manifest_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
             return
+
+        # Real dataset mode (local path): RadGenome-ChestCT provides preprocessed volumes.
+        dataset_dir = root / "dataset"
+        volumes_root = Path(str(cfg.get("volumes_root", dataset_dir / "train_preprocessed"))).expanduser()
+        if not volumes_root.is_absolute():
+            volumes_root = root / volumes_root
+
+        # If the expected structure exists and we can find at least one volume, ingest a small subset.
+        if volumes_root.exists():
+            max_files = int(cfg.get("max_volume_files", 50000))
+            volume_index: Dict[str, str] = _build_volume_index([volumes_root], max_files=max_files)
+            # Filter to radgenome-style train volumes by default (still allow others if user wants).
+            only_prefix = str(cfg.get("volume_name_prefix", "train_")).strip()
+            vol_items = [(name, path) for name, path in volume_index.items() if not only_prefix or str(name).startswith(only_prefix)]
+            vol_items.sort(key=lambda x: str(x[0]))
+
+            # Deterministic skip to vary the subset by seed.
+            skip = int(seed) % 997
+            if skip > 0 and len(vol_items) > 0:
+                vol_items = vol_items[skip:] + vol_items[:skip]
+
+            take = int(num_cases)
+            if take <= 0:
+                take = len(vol_items)
+            selected = vol_items[:take]
+
+            # Optional: write a minimally useful report from train_region_report.csv.
+            # This can be large; keep disabled by default.
+            sentences_by_volume: Dict[str, List[str]] = {}
+            if use_region_report:
+                csv_override = cfg.get("region_report_csv", None)
+                if csv_override:
+                    rr_csv = Path(str(csv_override)).expanduser()
+                    if not rr_csv.is_absolute():
+                        rr_csv = root / rr_csv
+                else:
+                    rr_csv = dataset_dir / "radgenome_files" / ("validation_region_report.csv" if split in {"val", "valid", "validation"} else "train_region_report.csv")
+                want = {str(name) for name, _ in selected}
+                if rr_csv.exists() and want:
+                    for row in _iter_csv_rows(rr_csv):
+                        vn = str(row.get("Volumename", "")).strip()
+                        if vn not in want:
+                            continue
+                        anatomy = str(row.get("Anatomy", "")).strip()
+                        sent = str(row.get("Sentence", "")).strip()
+                        if not sent:
+                            continue
+                        line = f"[{anatomy}] {sent}" if anatomy else sent
+                        sentences_by_volume.setdefault(vn, []).append(line)
+
+            for vol_name, vol_path in selected:
+                case_id = str(vol_name)
+                if case_id.endswith(".nii.gz"):
+                    case_id = case_id[: -len(".nii.gz")]
+                case_id = case_id.strip()
+                if not case_id:
+                    continue
+
+                rpt_path = reports_dir / f"{case_id}.txt"
+                if use_region_report and str(vol_name) in sentences_by_volume:
+                    content = "\n".join(sentences_by_volume.get(str(vol_name), [])) + "\n"
+                else:
+                    content = f"RadGenome-ChestCT placeholder report for {case_id}.\n"
+                rpt_path.write_text(content, encoding="utf-8")
+
+                lines.append(
+                    json.dumps(
+                        {
+                            "case_id": case_id,
+                            "volume_name": str(vol_name),
+                            "volume_path": str(vol_path),
+                            "report_path": str(rpt_path),
+                            "source": "radgenome-chestct",
+                            "dataset_split": str(split),
+                        },
+                        ensure_ascii=False,
+                    )
+                )
+
+            if lines:
+                manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                return
 
     # Synthetic fallback: write a small manifest where each sentence maps to one box.
     for i in range(max(1, int(num_cases))):

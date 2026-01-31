@@ -1,0 +1,16 @@
+source: radgenome
+
+# Local RadGenome-ChestCT root (this machine).
+radgenome_root: /data/tiasha/RadGenome-ChestCT
+
+out_dir: artifacts/radgenome_raw_e0930
+manifest_path: artifacts/radgenome_raw_e0930/manifest.jsonl
+
+# Select a small deterministic subset to keep the repo-skeleton loop lightweight.
+num_cases: 200
+seed: 0
+split: train
+
+# Optional (slow): parse train_region_report.csv and write sentence-level reports.
+use_region_report: false
+

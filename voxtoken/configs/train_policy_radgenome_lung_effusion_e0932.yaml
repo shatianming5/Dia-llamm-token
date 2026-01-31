@@ -1,0 +1,10 @@
+# Train policy config (RadGenome-ChestCT anatomy mask: lung effusion) (E0932)
+
+run_id: E0932
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/radgenome_policy_dataset_lung_effusion_e0932/dataset.jsonl
+
+train:
+  ridge: 1.0e-6
+
