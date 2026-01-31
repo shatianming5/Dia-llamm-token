@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -77,6 +78,31 @@ def _parse_experiment_table(ledger_path: Path) -> Dict[str, Dict[str, str]]:
     return rows
 
 
+_STACK_ENV = "VOXTOKEN_REPRODUCE_STACK"
+_MAX_NESTED_REPRODUCE_DEPTH = 20
+
+
+def _load_reproduce_stack() -> List[str]:
+    raw = str(os.environ.get(_STACK_ENV, "")).strip()
+    if not raw:
+        return []
+    try:
+        payload = json.loads(raw)
+        if isinstance(payload, list):
+            out: List[str] = []
+            for x in payload:
+                s = _normalize_exp_id(str(x))
+                if re.fullmatch(r"E\d{4}", s):
+                    out.append(s)
+            return out
+    except Exception:
+        pass
+
+    # Fallback for non-JSON stacks: comma-separated list.
+    parts = [_normalize_exp_id(p.strip()) for p in raw.split(",") if p.strip()]
+    return [p for p in parts if re.fullmatch(r"E\d{4}", p)]
+
+
 def reproduce(exp_id: str, *, ledger: str, dry_run: bool) -> Dict[str, Any]:
     started_at = _utc_now_iso()
     ledger_path = Path(ledger)
@@ -97,19 +123,28 @@ def reproduce(exp_id: str, *, ledger: str, dry_run: bool) -> Dict[str, Any]:
     if not cmd:
         raise ValueError(f"Experiment {exp_id_norm} has empty 1GPU script.")
 
-    # Avoid foot-gun recursion like reproducing E0800 (which calls reproduce again).
-    if "voxtoken.runner.reproduce" in cmd:
+    stack = _load_reproduce_stack()
+    if exp_id_norm in stack:
+        cycle = " -> ".join([*stack, exp_id_norm])
+        raise RuntimeError(f"Refusing to reproduce {exp_id_norm}: cycle detected ({cycle}).")
+    if len(stack) >= _MAX_NESTED_REPRODUCE_DEPTH:
         raise RuntimeError(
-            "Refusing to execute a command that invokes voxtoken.runner.reproduce (would recurse)."
+            f"Refusing to reproduce {exp_id_norm}: nested reproduce depth exceeded "
+            f"({_MAX_NESTED_REPRODUCE_DEPTH})."
         )
+    next_stack = [*stack, exp_id_norm]
 
     print(f"[reproduce] exp_id={exp_id_norm}")
     print(f"[reproduce] ledger={ledger_path}")
     print(f"[reproduce] cmd={cmd}")
+    if next_stack:
+        print(f"[reproduce] stack_depth={len(next_stack)} stack={next_stack}")
 
     exit_code = 0
     if not dry_run:
-        proc = subprocess.run(["bash", "-lc", cmd], check=False)
+        env = dict(os.environ)
+        env[_STACK_ENV] = json.dumps(next_stack, ensure_ascii=False)
+        proc = subprocess.run(["bash", "-lc", cmd], check=False, env=env)
         exit_code = int(proc.returncode or 0)
 
     ended_at = _utc_now_iso()
