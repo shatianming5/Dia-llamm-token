@@ -151,6 +151,18 @@ python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0940_0944_smoke.jso
 python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0940_0944_full.json --overwrite
 ```
 
+paper-track（RadGenome lung nodule）关键产物：
+
+- `artifacts/radgenome_gt_lung_nodule_e0941/summary.json`：GT-box manifest 构建统计（train/val counts、missing/empty masks）
+- `outputs/train_policy/E0942_seed{0,1,2}/checkpoint.json` + `model.pt`：learned split policy（torch）
+- `artifacts/e0943_benchmark_radgenome_lung_nodule_seed{0,1,2}/summary.json`：multi-seed benchmark 汇总
+- `artifacts/paper_e0944_radgenome_lung_nodule/table1_main_ci.csv`：主表（multi-seed bootstrap CI）
+
+参考结果（RadGenome lung nodule，val n=100，full run 于 2026-01-31 产出）：
+
+- budget_B=32：learned mean IoU=0.1128（CI≈[0.0979, 0.1270]），random=0.1133（≈[0.0987, 0.1278]），heuristic=0.1104（≈[0.0965, 0.1255]），oracle=0.1776（≈[0.1658, 0.1896]）
+- 结论：learned 与 random/heuristic **几乎持平**（差异在 1e-3 量级，CI 明显重叠），但与 oracle 仍有显著 gap，说明“token split 选择策略”仍有大量可挖掘空间
+
 ### 4.4 split 与 seed（对齐 plan）
 
 - patient-level split（避免同一病人泄漏到 train/test）
@@ -198,7 +210,8 @@ python -m voxtoken.runner.unified_eval --in artifacts/infer/run.json --out artif
 
 ## 6. 训练（Training）
 
-> 训练脚本当前为最小占位实现：会落盘 `config.json` / `metrics.jsonl` / `checkpoint.json` 到 `outputs/`，用于固定 stage 切分与产物路径；后续再替换为真实训练。
+> 训练脚本大多数仍为“repo-skeleton 口径”的最小实现：用于固定 stage 切分与产物路径。  
+> 例外：paper-track 的 `voxtoken/runner/train_policy_torch.py`（E0942）会真实训练一个小型 torch policy（落盘 `model.pt`），并在 E0943 基准评测中加载对照 random/oracle。
 
 ### 6.1 单卡启动（占位）
 
