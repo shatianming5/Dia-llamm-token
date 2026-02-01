@@ -18,6 +18,7 @@ class SplitPolicy(Module):
         self.use_torch = False
         self.torch_model = None
         self.torch_input_dim = 4
+        self.torch_feature_norm = None
 
         weights_cfg = dict(cfg.get("weights", {}))
         self.weights: Dict[str, float] = {
@@ -42,6 +43,17 @@ class SplitPolicy(Module):
 
                 model_path = payload.get("model_path", None)
                 model_cfg = payload.get("model", {}) if isinstance(payload, dict) else {}
+                feat_norm = payload.get("feature_norm", None) if isinstance(payload, dict) else None
+                if isinstance(feat_norm, dict) and str(feat_norm.get("type", "")).strip().lower() == "zscore":
+                    mean = feat_norm.get("mean", None)
+                    std = feat_norm.get("std", None)
+                    if isinstance(mean, list) and isinstance(std, list) and len(mean) == len(std) and len(mean) > 0:
+                        try:
+                            mean_f = [float(x) for x in mean]
+                            std_f = [float(x) if float(x) > 0.0 else 1.0 for x in std]
+                            self.torch_feature_norm = {"type": "zscore", "mean": mean_f, "std": std_f}
+                        except Exception:
+                            self.torch_feature_norm = None
                 if isinstance(model_path, str) and model_path.strip() and torch is not None:
                     mp = Path(model_path.strip())
                     if not mp.is_absolute():
@@ -79,6 +91,15 @@ class SplitPolicy(Module):
         if self.use_torch and torch is not None and self.torch_model is not None and feats:
             dim = int(getattr(self, "torch_input_dim", 4) or 4)
             dim = max(4, min(16, int(dim)))
+            fn = getattr(self, "torch_feature_norm", None)
+            mean = None
+            std = None
+            if isinstance(fn, dict) and str(fn.get("type", "")).strip().lower() == "zscore":
+                m = fn.get("mean", None)
+                s = fn.get("std", None)
+                if isinstance(m, list) and isinstance(s, list) and len(m) == len(s) and len(m) == int(dim):
+                    mean = [float(x) for x in m]
+                    std = [float(x) if float(x) > 0.0 else 1.0 for x in s]
 
             def vec(f: TokenFeatures) -> List[float]:
                 base = [
@@ -99,7 +120,10 @@ class SplitPolicy(Module):
                     base.append(float(getattr(f, "max_intensity", 0.0)))
                 if dim >= 10:
                     base.append(float(getattr(f, "level", 0.0)))
-                return base[:dim] + [0.0 for _ in range(max(0, dim - len(base)))]
+                v = base[:dim] + [0.0 for _ in range(max(0, dim - len(base)))]
+                if mean is not None and std is not None:
+                    v = [(float(v[i]) - float(mean[i])) / float(std[i]) for i in range(int(dim))]
+                return v
 
             x = torch.tensor([vec(f) for f in feats], dtype=torch.float32)
             with torch.no_grad():

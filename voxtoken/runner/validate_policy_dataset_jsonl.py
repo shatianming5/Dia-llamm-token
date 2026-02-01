@@ -4,7 +4,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 
 def _load_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -42,6 +42,8 @@ def validate_policy_dataset(
     require_cases_ge: int | None,
     require_label: bool,
     require_budgets: List[int],
+    require_step_idx: bool,
+    require_exactly_one_positive_per_step: bool,
 ) -> List[str]:
     errors: List[str] = []
     if require_rows_ge is not None and len(rows) < int(require_rows_ge):
@@ -66,6 +68,8 @@ def validate_policy_dataset(
                         errors.append(f"row[{i}] label must be 0/1 (got {r.get('label')!r})")
                 except Exception:
                     errors.append(f"row[{i}] label must be int-like 0/1 (got {r.get('label')!r})")
+        if require_step_idx and "step_idx" not in r:
+            errors.append(f"row[{i}] missing key: step_idx")
 
     if require_budgets:
         seen = set()
@@ -80,6 +84,62 @@ def validate_policy_dataset(
         if missing:
             errors.append(f"dataset missing required budgets: {missing} (seen={sorted(seen)})")
 
+    if require_step_idx or require_exactly_one_positive_per_step:
+        for i, r in enumerate(rows):
+            if "step_idx" not in r:
+                if require_step_idx:
+                    errors.append(f"row[{i}] missing key: step_idx")
+                continue
+            try:
+                s = int(r.get("step_idx", 0))
+            except Exception:
+                errors.append(f"row[{i}] step_idx must be int-like (got {r.get('step_idx')!r})")
+                continue
+            if int(s) < 0:
+                errors.append(f"row[{i}] step_idx must be >=0 (got {s})")
+
+    if require_exactly_one_positive_per_step:
+        by_group: Dict[Tuple[str, int, int], Dict[str, int]] = {}
+        for r in rows:
+            cid = str(r.get("case_id", "")).strip()
+            if not cid:
+                continue
+            try:
+                b = int(r.get("budget_B", 0) or 0)
+                s = int(r.get("step_idx", 0) or 0)
+            except Exception:
+                continue
+            if int(b) <= 0 or int(s) < 0:
+                continue
+            gk = (cid, int(b), int(s))
+            st = by_group.get(gk)
+            if st is None:
+                st = {"n": 0, "pos": 0}
+                by_group[gk] = st
+            st["n"] += 1
+            try:
+                y = int(r.get("label", 0) or 0)
+            except Exception:
+                y = 0
+            if int(y) == 1:
+                st["pos"] += 1
+
+        if not by_group:
+            errors.append("no (case_id,budget_B,step_idx) groups found; cannot validate per-step label constraints")
+        else:
+            bad: List[str] = []
+            for (cid, b, s), st in by_group.items():
+                if int(st.get("n", 0)) < 2:
+                    bad.append(f"{cid}|B{b}|step{s}: n={st.get('n')} (<2)")
+                    continue
+                if int(st.get("pos", 0)) != 1:
+                    bad.append(f"{cid}|B{b}|step{s}: pos={st.get('pos')} (!=1)")
+                    continue
+                if len(bad) >= 10:
+                    break
+            if bad:
+                errors.append("per-step label constraint failed for some groups (showing up to 10): " + "; ".join(bad))
+
     return errors
 
 
@@ -90,6 +150,12 @@ def main() -> None:
     parser.add_argument("--require-cases-ge", type=int, default=None)
     parser.add_argument("--require-label", action="store_true", help="Require oracle-imitation label field (0/1)")
     parser.add_argument("--require-budgets", default="", help="Comma-separated list of required budget_B values (e.g., '16,32')")
+    parser.add_argument("--require-step-idx", action="store_true", help="Require step_idx field (for listwise training)")
+    parser.add_argument(
+        "--require-exactly-one-positive-per-step",
+        action="store_true",
+        help="Require exactly one label==1 per (case_id,budget_B,step_idx) group (and group size>=2)",
+    )
     args = parser.parse_args()
 
     p = Path(args.dataset_jsonl)
@@ -105,6 +171,8 @@ def main() -> None:
         require_cases_ge=args.require_cases_ge,
         require_label=bool(args.require_label),
         require_budgets=list(req_budgets),
+        require_step_idx=bool(args.require_step_idx),
+        require_exactly_one_positive_per_step=bool(args.require_exactly_one_positive_per_step),
     )
     if errors:
         for e in errors:

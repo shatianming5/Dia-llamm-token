@@ -97,6 +97,63 @@ def _fit_linear_weights(xs: List[List[float]], ys: List[float], *, ridge: float)
     return weights, meta
 
 
+def _extract_feature_vector(obj: Dict[str, Any], *, input_dim: int) -> List[float]:
+    input_dim = int(input_dim)
+    if int(input_dim) < 4:
+        raise ValueError(f"model.input_dim must be >=4 (got {input_dim})")
+    x = [
+        float(obj.get("recon_error", 0.0)),
+        float(obj.get("evidence_entropy", 0.0)),
+        float(obj.get("citation_pressure", 0.0)),
+        float(obj.get("history_splits", 0.0)),
+    ]
+    if int(input_dim) >= 5:
+        x.append(float(obj.get("center_x_mm", 0.0)))
+    if int(input_dim) >= 6:
+        x.append(float(obj.get("center_y_mm", 0.0)))
+    if int(input_dim) >= 7:
+        x.append(float(obj.get("center_z_mm", 0.0)))
+    if int(input_dim) >= 8:
+        x.append(float(obj.get("mean_intensity", 0.0)))
+    if int(input_dim) >= 9:
+        x.append(float(obj.get("max_intensity", 0.0)))
+    if int(input_dim) >= 10:
+        x.append(float(obj.get("level", 0.0)))
+    if len(x) < int(input_dim):
+        x = x + [0.0 for _ in range(int(input_dim) - len(x))]
+    x = x[: int(input_dim)]
+    return [float(v) for v in x]
+
+
+def _zscore_stats(xs: List[List[float]], *, input_dim: int, eps: float) -> Tuple[List[float], List[float]]:
+    if not xs:
+        raise ValueError("cannot compute feature norm stats on empty xs")
+    input_dim = int(input_dim)
+    n = int(len(xs))
+    mean = [0.0 for _ in range(int(input_dim))]
+    for x in xs:
+        if len(x) < int(input_dim):
+            continue
+        for j in range(int(input_dim)):
+            mean[j] += float(x[j])
+    for j in range(int(input_dim)):
+        mean[j] /= float(max(1, int(n)))
+
+    var = [0.0 for _ in range(int(input_dim))]
+    for x in xs:
+        if len(x) < int(input_dim):
+            continue
+        for j in range(int(input_dim)):
+            d = float(x[j]) - float(mean[j])
+            var[j] += d * d
+    for j in range(int(input_dim)):
+        var[j] /= float(max(1, int(n)))
+
+    std = [(float(v) ** 0.5) for v in var]
+    std = [float(s) if float(s) > float(eps) else 1.0 for s in std]
+    return [float(m) for m in mean], [float(s) for s in std]
+
+
 def _load_dataset_jsonl(
     path: Path,
     *,
@@ -112,8 +169,8 @@ def _load_dataset_jsonl(
     if int(input_dim) < 4:
         raise ValueError(f"model.input_dim must be >=4 (got {input_dim})")
     loss_norm = str(loss or "mse").strip().lower() or "mse"
-    if loss_norm not in {"mse", "bce"}:
-        raise ValueError(f"train.loss must be one of: mse|bce (got {loss!r})")
+    if loss_norm not in {"mse", "bce", "list_ce"}:
+        raise ValueError(f"train.loss must be one of: mse|bce|list_ce (got {loss!r})")
     label_key = str(label_key or "label").strip() or "label"
     n = 0
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -123,29 +180,9 @@ def _load_dataset_jsonl(
         if not isinstance(obj, dict):
             continue
         try:
-            x = [
-                float(obj.get("recon_error", 0.0)),
-                float(obj.get("evidence_entropy", 0.0)),
-                float(obj.get("citation_pressure", 0.0)),
-                float(obj.get("history_splits", 0.0)),
-            ]
-            if int(input_dim) >= 5:
-                x.append(float(obj.get("center_x_mm", 0.0)))
-            if int(input_dim) >= 6:
-                x.append(float(obj.get("center_y_mm", 0.0)))
-            if int(input_dim) >= 7:
-                x.append(float(obj.get("center_z_mm", 0.0)))
-            if int(input_dim) >= 8:
-                x.append(float(obj.get("mean_intensity", 0.0)))
-            if int(input_dim) >= 9:
-                x.append(float(obj.get("max_intensity", 0.0)))
-            if int(input_dim) >= 10:
-                x.append(float(obj.get("level", 0.0)))
-            if len(x) < int(input_dim):
-                x = x + [0.0 for _ in range(int(input_dim) - len(x))]
-            x = x[: int(input_dim)]
+            x = _extract_feature_vector(obj, input_dim=int(input_dim))
             reward = float(obj.get("reward", 0.0))
-            if loss_norm == "bce":
+            if loss_norm in {"bce", "list_ce"}:
                 y = float(obj.get(label_key, 0.0))
             else:
                 y = float(reward)
@@ -158,6 +195,93 @@ def _load_dataset_jsonl(
         if int(max_samples) > 0 and n >= int(max_samples):
             break
     return xs, train_ys, reward_ys
+
+
+def _load_dataset_groups_jsonl(
+    path: Path,
+    *,
+    max_groups: int,
+    input_dim: int,
+    label_key: str,
+) -> List[Dict[str, Any]]:
+    """
+    Build listwise groups keyed by (case_id, budget_B, step_idx).
+
+    Each group is a dict:
+      - x: List[List[float]]  (n_candidates, input_dim)
+      - target: int           (index of the single label==1 candidate)
+      - case_id/budget_B/step_idx (for audit)
+    """
+    label_key = str(label_key or "label").strip() or "label"
+
+    by_key: Dict[Tuple[str, int, int], Dict[str, Any]] = {}
+    order: List[Tuple[str, int, int]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        obj = json.loads(line)
+        if not isinstance(obj, dict):
+            continue
+
+        case_id = str(obj.get("case_id", "")).strip()
+        if not case_id:
+            continue
+        try:
+            budget_B = int(obj.get("budget_B", 0) or 0)
+        except Exception:
+            continue
+        if budget_B <= 0:
+            continue
+        try:
+            step_idx = int(obj.get("step_idx", obj.get("step", 0)) or 0)
+        except Exception:
+            continue
+        if step_idx < 0:
+            continue
+
+        try:
+            x = _extract_feature_vector(obj, input_dim=int(input_dim))
+        except Exception:
+            continue
+        try:
+            label = int(obj.get(label_key, 0) or 0)
+        except Exception:
+            label = 0
+        label = 1 if int(label) == 1 else 0
+
+        key = (case_id, int(budget_B), int(step_idx))
+        g = by_key.get(key)
+        if g is None:
+            if int(max_groups) > 0 and len(order) >= int(max_groups):
+                continue
+            g = {"x": [], "labels": [], "case_id": case_id, "budget_B": int(budget_B), "step_idx": int(step_idx)}
+            by_key[key] = g
+            order.append(key)
+        g["x"].append(x)
+        g["labels"].append(int(label))
+
+    groups: List[Dict[str, Any]] = []
+    for key in order:
+        g = by_key.get(key)
+        if not g:
+            continue
+        xs = list(g.get("x") or [])
+        labels = list(g.get("labels") or [])
+        if len(xs) < 2:
+            continue
+        pos = [i for i, v in enumerate(labels) if int(v) == 1]
+        if len(pos) != 1:
+            continue
+        groups.append(
+            {
+                "x": xs,
+                "target": int(pos[0]),
+                "case_id": str(g.get("case_id", "")),
+                "budget_B": int(g.get("budget_B", 0) or 0),
+                "step_idx": int(g.get("step_idx", 0) or 0),
+            }
+        )
+    return groups
 
 
 def _dist_info() -> Tuple[int, int, int]:
@@ -205,6 +329,8 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
     loss_name = str(train_cfg.get("loss", "mse")).strip().lower() or "mse"
     label_key = str(train_cfg.get("label_key", "label")).strip() or "label"
     pos_weight = float(train_cfg.get("pos_weight", 1.0))
+    feature_norm = str(train_cfg.get("feature_norm", "none")).strip().lower() or "none"
+    feature_norm_eps = float(train_cfg.get("feature_norm_eps", 1.0e-6))
 
     fp16 = bool(ddp_cfg.get("fp16", False))
     backend = str(ddp_cfg.get("backend", "nccl")).strip().lower() or "nccl"
@@ -237,22 +363,21 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
     if not xs:
         raise ValueError("dataset_jsonl is empty or unreadable")
 
-    x_tensor = torch.tensor(xs, dtype=torch.float32)
-    y_tensor = torch.tensor(ys, dtype=torch.float32)
+    feature_norm = str(feature_norm or "none").strip().lower() or "none"
+    if feature_norm not in {"none", "zscore"}:
+        raise ValueError(f"train.feature_norm must be one of: none|zscore (got {feature_norm!r})")
+    feat_mean: List[float] | None = None
+    feat_std: List[float] | None = None
+    if feature_norm == "zscore":
+        feat_mean, feat_std = _zscore_stats(xs, input_dim=int(input_dim), eps=float(feature_norm_eps))
 
-    ds = torch.utils.data.TensorDataset(x_tensor, y_tensor)  # type: ignore[attr-defined]
-    if distributed:
-        sampler = torch.utils.data.distributed.DistributedSampler(ds, shuffle=True, seed=int(seed))  # type: ignore[attr-defined]
-    else:
-        sampler = None
-
-    loader = torch.utils.data.DataLoader(  # type: ignore[attr-defined]
-        ds,
-        batch_size=int(batch_size),
-        shuffle=(sampler is None),
-        sampler=sampler,
-        drop_last=False,
-    )
+    def _norm_vec(x: List[float]) -> List[float]:
+        if feat_mean is None or feat_std is None:
+            return list(x)
+        if len(x) < int(input_dim):
+            x = list(x) + [0.0 for _ in range(int(input_dim) - len(x))]
+        x = x[: int(input_dim)]
+        return [(float(x[j]) - float(feat_mean[j])) / float(feat_std[j]) for j in range(int(input_dim))]
 
     from ..models.policy_mlp import PolicyMLP
 
@@ -273,10 +398,87 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
         model = DDP(model, device_ids=[int(local_rank)] if device.type == "cuda" else None)
 
     opt = torch.optim.Adam(model.parameters(), lr=float(lr), weight_decay=float(weight_decay))
-    if str(loss_name) == "bce":
-        loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([float(pos_weight)], dtype=torch.float32, device=device))
+    loss_norm = str(loss_name).strip().lower() or "mse"
+    if loss_norm not in {"mse", "bce", "list_ce"}:
+        raise ValueError(f"train.loss must be one of: mse|bce|list_ce (got {loss_name!r})")
+
+    if loss_norm == "list_ce":
+        # Listwise CE over candidate tokens per (case_id, budget_B, step_idx).
+        groups = _load_dataset_groups_jsonl(
+            dataset_jsonl,
+            max_groups=int(max_samples),
+            input_dim=int(input_dim),
+            label_key=str(label_key),
+        )
+        if not groups:
+            raise ValueError("dataset_jsonl has no valid listwise groups (need step_idx + exactly-one positive label per step)")
+
+        class _GroupDataset(torch.utils.data.Dataset):  # type: ignore[attr-defined]
+            def __init__(self, gs: List[Dict[str, Any]]):
+                self._gs = list(gs)
+
+            def __len__(self) -> int:
+                return int(len(self._gs))
+
+            def __getitem__(self, idx: int) -> Tuple[List[List[float]], int]:
+                g = self._gs[int(idx)]
+                xs_g = g.get("x") or []
+                tgt = int(g.get("target", 0))
+                return list(xs_g), int(tgt)
+
+        ds = _GroupDataset(groups)
+        if distributed:
+            sampler = torch.utils.data.distributed.DistributedSampler(ds, shuffle=True, seed=int(seed))  # type: ignore[attr-defined]
+        else:
+            sampler = None
+
+        def _collate(batch: List[Tuple[List[List[float]], int]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            bsz = int(len(batch))
+            max_len = 1
+            for xs_g, _t in batch:
+                max_len = max(int(max_len), int(len(xs_g)))
+            dim = int(input_dim)
+
+            x_pad = torch.zeros((bsz, int(max_len), int(dim)), dtype=torch.float32)
+            mask = torch.zeros((bsz, int(max_len)), dtype=torch.bool)
+            target = torch.zeros((bsz,), dtype=torch.long)
+            for i, (xs_g, t) in enumerate(batch):
+                n = int(len(xs_g))
+                if n <= 0:
+                    continue
+                x_pad[i, :n, :] = torch.tensor([_norm_vec(list(v)) for v in xs_g], dtype=torch.float32)
+                mask[i, :n] = True
+                target[i] = int(t)
+            return x_pad, mask, target
+
+        loader = torch.utils.data.DataLoader(  # type: ignore[attr-defined]
+            ds,
+            batch_size=int(batch_size),
+            shuffle=(sampler is None),
+            sampler=sampler,
+            drop_last=False,
+            collate_fn=_collate,
+        )
     else:
-        loss_fn = torch.nn.MSELoss()
+        # Pointwise training (historical).
+        x_tensor = torch.tensor([_norm_vec(list(x)) for x in xs], dtype=torch.float32)
+        y_tensor = torch.tensor(ys, dtype=torch.float32)
+        ds = torch.utils.data.TensorDataset(x_tensor, y_tensor)  # type: ignore[attr-defined]
+        if distributed:
+            sampler = torch.utils.data.distributed.DistributedSampler(ds, shuffle=True, seed=int(seed))  # type: ignore[attr-defined]
+        else:
+            sampler = None
+        loader = torch.utils.data.DataLoader(  # type: ignore[attr-defined]
+            ds,
+            batch_size=int(batch_size),
+            shuffle=(sampler is None),
+            sampler=sampler,
+            drop_last=False,
+        )
+        if loss_norm == "bce":
+            loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([float(pos_weight)], dtype=torch.float32, device=device))
+        else:
+            loss_fn = torch.nn.MSELoss()
 
     scaler = torch.cuda.amp.GradScaler(enabled=bool(fp16 and device.type == "cuda"))
     autocast = torch.cuda.amp.autocast
@@ -288,48 +490,83 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
 
         total_loss = 0.0
         total_n = 0
-        for xb, yb in loader:
-            xb = xb.to(device)
-            yb = yb.to(device)
+        total_acc = 0.0
+        if loss_norm == "list_ce":
+            import torch.nn.functional as F  # type: ignore
 
-            opt.zero_grad(set_to_none=True)
-            with autocast(enabled=bool(scaler.is_enabled())):
-                pred = model(xb)
-                loss = loss_fn(pred.view(-1), yb.view(-1))
-            if scaler.is_enabled():
-                scaler.scale(loss).backward()
-                scaler.step(opt)
-                scaler.update()
-            else:
-                loss.backward()
-                opt.step()
+            for xb, mask, target in loader:
+                xb = xb.to(device)
+                mask = mask.to(device)
+                target = target.to(device)
 
-            total_loss += float(loss.detach().cpu().item()) * int(xb.shape[0])
-            total_n += int(xb.shape[0])
+                bsz, seq_len, dim = xb.shape
+                opt.zero_grad(set_to_none=True)
+                with autocast(enabled=bool(scaler.is_enabled())):
+                    logits = model(xb.view(int(bsz) * int(seq_len), int(dim))).view(int(bsz), int(seq_len))
+                    logits = logits.masked_fill(~mask, -1.0e9)
+                    loss = F.cross_entropy(logits, target)
+                if scaler.is_enabled():
+                    scaler.scale(loss).backward()
+                    scaler.step(opt)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    opt.step()
+
+                with torch.no_grad():
+                    pred_idx = torch.argmax(logits, dim=1)
+                    acc = (pred_idx == target).to(torch.float32).sum().detach()
+                total_loss += float(loss.detach().cpu().item()) * int(bsz)
+                total_acc += float(acc.detach().cpu().item())
+                total_n += int(bsz)
+        else:
+            for xb, yb in loader:
+                xb = xb.to(device)
+                yb = yb.to(device)
+
+                opt.zero_grad(set_to_none=True)
+                with autocast(enabled=bool(scaler.is_enabled())):
+                    pred = model(xb)
+                    loss = loss_fn(pred.view(-1), yb.view(-1))  # type: ignore[name-defined]
+                if scaler.is_enabled():
+                    scaler.scale(loss).backward()
+                    scaler.step(opt)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    opt.step()
+
+                total_loss += float(loss.detach().cpu().item()) * int(xb.shape[0])
+                total_n += int(xb.shape[0])
 
         if distributed:
             import torch.distributed as dist  # type: ignore
 
-            t = torch.tensor([float(total_loss), float(total_n)], dtype=torch.float32, device=device)
+            t = torch.tensor([float(total_loss), float(total_acc), float(total_n)], dtype=torch.float32, device=device)
             dist.all_reduce(t, op=dist.ReduceOp.SUM)
             total_loss = float(t[0].detach().cpu().item())
-            total_n = int(t[1].detach().cpu().item())
+            total_acc = float(t[1].detach().cpu().item())
+            total_n = int(t[2].detach().cpu().item())
 
         mean_loss = float(total_loss) / float(max(1, int(total_n)))
+        mean_acc = float(total_acc) / float(max(1, int(total_n)))
         if int(rank) == 0:
-            epoch_rows.append(
-                {
-                    "timestamp_utc": _utc_now_iso(),
-                    "epoch": int(epoch),
-                    "loss_mse": float(mean_loss),
-                    "loss": str(loss_name),
-                    "pos_weight": float(pos_weight),
-                    "n_samples": int(total_n),
-                    "seed": int(seed),
-                    "world_size": int(world_size),
-                    "device": str(device),
-                }
-            )
+            row: Dict[str, Any] = {
+                "timestamp_utc": _utc_now_iso(),
+                "epoch": int(epoch),
+                "loss": str(loss_name),
+                "n_samples": int(total_n),
+                "seed": int(seed),
+                "world_size": int(world_size),
+                "device": str(device),
+            }
+            if loss_norm == "list_ce":
+                row["loss_list_ce"] = float(mean_loss)
+                row["top1_acc"] = float(mean_acc)
+            else:
+                row["loss_mse"] = float(mean_loss)
+                row["pos_weight"] = float(pos_weight)
+            epoch_rows.append(row)
 
     if distributed:
         import torch.distributed as dist  # type: ignore
@@ -363,6 +600,13 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
             },
             "model_path": str(model_path.name),
         }
+        if feat_mean is not None and feat_std is not None:
+            checkpoint["feature_norm"] = {
+                "type": "zscore",
+                "mean": list(feat_mean),
+                "std": list(feat_std),
+                "eps": float(feature_norm_eps),
+            }
 
         (run_dir / "config.json").write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         checkpoint_path.write_text(json.dumps(checkpoint, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

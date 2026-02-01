@@ -157,6 +157,10 @@ python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0945_0948_full.json
 # 例：full-eligible nodule（E0949–E0953；去掉 E0941 的 max-cases 上限，覆盖所有可解析的 nodule masks）
 python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0949_0953_smoke.json --overwrite
 python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0949_0953_full.json --overwrite
+
+# 例：listwise + zscore policy（E0959–E0963；在 val=100 和 full-eligible val=126 上通过 ΔIoU@B=32 gate）
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0959_0963_smoke.json --overwrite
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0959_0963_full.json --overwrite
 ```
 
 paper-track（RadGenome lung nodule）关键产物：
