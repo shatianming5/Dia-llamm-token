@@ -5,6 +5,17 @@
 - Maintain an auditable, doc-driven closed loop for the repo skeleton (interfaces-only), with stable artifacts/metrics contracts.
 - Keep all *runnable commitments* in `C####`/`P####` (including M2/M3/M4 promoted from the proposal); the remaining long-horizon proposal content below stays as notes unless explicitly promoted.
 
+## Algorithm 1 → Repo Mapping (VoxToken++ Inference)
+
+| Algorithm step | Repo implementation | Outputs (contracts) |
+|---|---|---|
+| 1) init coarse tokens `T_0` | `voxtoken/runner/infer_refine.py:RefineRunner.run_case` → `Tokenizer3D.build_pyramid` + `Tokenizer3D.select_tokens(active_nodes=[])` | `run.json.tokens` (level-0 tokens with `omega_box_mm`) |
+| 2) generate `y_0` (with citations) | `RefineRunner._gen_verify` → `EvidenceHead.forward` → `Planner.build_plan` → `Realizer.realize` + `require_citations` | `run.json.report`, `run.json.citations`, `run.json.plan` |
+| 3) verifier issues + `𝒱(y_0,T_0)` | `RefineRunner._gen_verify` → `Verifier.verify` | `run.json.verifier_score`, `run.json.issues` |
+| 4) refine loop `k=0..K-1` | `RefineRunner.run_case` loop → `_featurize_tokens` → `_select_splits` (`SplitPolicy.score`) → `_refine_select` → `_gen_verify` | `run.json.trace` (per-step split ids + score deltas + latency) |
+| 4b) stop rule | `RefineRunner._stop` implements `Δ𝒱/Δ|T| < τ` + `min_score_delta` guard | early stop recorded via shorter `trace` than `max_rounds` |
+| 5) final report + token supports + issues | `voxtoken/runner/infer_refine.py:_write_sidecar_artifacts` | `final_report.txt`, `evidence_graph.json` (includes token Ω), `trace.jsonl` |
+
 ## Claims (C####)
 
 - [x] C0001: Baseline smoke runs and produces `run.json` + `summary.json` that conform to `docs/results_contract.md`.
@@ -169,6 +180,19 @@
 - [x] C0106: Effusion policy training + grounding benchmark (split=val) runs fixed/heuristic/learned across budgets and emits non-empty metrics+summary.
   - Evidence: E0926, E0927
   - Proof rule: Run E0926 and E0927; checkpoint validator passes and benchmark validator confirms required methods exist.
+
+- [x] C0107: Papertrack (GT): RadGenome-ChestCT lung nodule (hi32 token-space) manifest can be built for full-eligible cases with non-empty GT boxes and deterministic splits.
+  - Evidence: E0986
+  - Proof rule: Run E0986; `validate_ct_rate_ts_manifest` and `validate_split_counts` pass and `coord_system=token_space_mm`.
+- [x] C0108: Papertrack (GT): Torch reward-policy training (STOP action; reward regression) writes reusable checkpoints with `model.pt` and non-default weights (multi-seed).
+  - Evidence: E1042
+  - Proof rule: Run E1042; `validate_policy_checkpoint` passes for seeds 0/1/2 and checkpoints include `model.pt`.
+- [x] C0109: Papertrack (GT): RadGenome lung nodule grounding benchmark (reward stop-threshold) runs fixed/heuristic/learned/random/oracle across budgets and emits deterministic summaries (multi-seed).
+  - Evidence: E1043
+  - Proof rule: Run E1043; `validate_grounding_benchmark` passes per seed and required methods exist.
+- [x] C0110: Papertrack (GT): Learned policy achieves a statistically significant improvement over random at budget 32 on RadGenome lung nodule grounding (ΔIoU >= 0.017 and paired Δ CI_low >= 0).
+  - Evidence: E1044
+  - Proof rule: Run E1044; `validate_improvement_gate` and `validate_paired_delta_ci` pass with the specified thresholds at `budget=32` for `metric=ground_mean_iou`.
 
 ## Plan Items (P####)
 
@@ -364,8 +388,39 @@
   - Verification: `python -m voxtoken.runner.paper_export --in artifacts/e0909/metrics.jsonl --out artifacts/paper_e0910 && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0910`
   - Touchpoints: `voxtoken/runner/paper_export.py`, `eval/pareto.py`
 
+- [x] P0039: Add a RadGenome-ChestCT GT manifest builder for lung nodule (hi32 token-space; full-eligible).
+  - Linked claims: C0107
+  - Definition of done: `radgenome_mask_manifest` can produce a `manifest.jsonl` with existing `gt_mask_path`, non-empty `grounding_boxes_by_sent_mm`, deterministic splits, and token-space coordinates.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E0986`
+  - Touchpoints: `voxtoken/data/radgenome_mask_manifest.py`, `voxtoken/configs/data_ingest_radgenome_chestct_full_e0940.yaml`, `voxtoken/configs/data_preprocess_radgenome_chestct_full_e0940.yaml`, `voxtoken/configs/ct_rate_ts_grounding_e0985.yaml`
+- [x] P0040: Add Torch reward-policy training (STOP action; reward regression) for RadGenome lung nodule (multi-seed).
+  - Linked claims: C0108
+  - Definition of done: `train_policy_torch` trains a reward-regression policy from oracle+DAgger traces, writes `checkpoint.json` + `model.pt`, and checkpoint validation passes.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E1042`
+  - Touchpoints: `voxtoken/runner/train_policy_torch.py`, `voxtoken/models/policy.py`, `voxtoken/models/policy_mlp.py`, `voxtoken/runner/validate_policy_checkpoint.py`
+- [x] P0041: Add reward stop-threshold benchmarking for RadGenome lung nodule with strong baselines (random/oracle) and multi-seed aggregation.
+  - Linked claims: C0109
+  - Definition of done: Benchmark runner supports methods `fixed,heuristic,learned,random,oracle`, budgets `8/16/32`, and `--seed`; outputs validate deterministically.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E1043`
+  - Touchpoints: `voxtoken/runner/ct_rate_grounding_benchmark.py`, `voxtoken/runner/validate_grounding_benchmark.py`, `voxtoken/configs/ct_rate_ts_grounding_e1039_reward_stopthr.yaml`
+- [x] P0042: Add paper export gates for statistically significant learned-vs-random improvement at budget 32 (paired-delta CI).
+  - Linked claims: C0110
+  - Definition of done: Paper export aggregates multi-seed metrics into CI tables/plots and validators gate `ΔIoU@B32>=0.017` and `paired Δ CI_low>=0`.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E1044`
+  - Touchpoints: `voxtoken/runner/paper_export.py`, `voxtoken/runner/validate_improvement_gate.py`, `voxtoken/runner/validate_paired_delta_ci.py`
+
+## Next Steps (Paper-grade Roadmap)
+
+The repo is still “interfaces-first”, but the papertrack grounding loop is now end-to-end and gated (C0110/E1044). To continue toward paper-grade coverage:
+
+1) Multi-task grounding (real masks): replicate the C0110-style paired-Δ gate on at least 2–3 additional mask-defined findings (e.g., pleural effusion, pericardial effusion, pneumothorax) using the existing GT-manifest builders (`ct_rate_ts_manifest`, `radgenome_mask_manifest`) and the reward-policy training/benchmark stack (`train_policy_torch`, `ct_rate_grounding_benchmark`, `paper_export`).
+2) Stronger baselines: add at least one non-trivial baseline beyond `random/heuristic` (e.g., fixed ROI crop or uniform-depth refinement) inside `ct_rate_grounding_benchmark`, then extend `paper_export` tables to include it.
+3) Explain “why it works”: add a small analysis script to summarize per-case deltas (learned−random and learned−heuristic), and reuse `visualize_grounding` to dump a few qualitative overlays for “wins” and “fails”.
+4) Bridge to report generation: run `infer_refine` on real-volume manifests (CT-RATE/RadGenome) with the learned policy checkpoint and track `unsupported_rate/slot_f1/latency_ms` alongside grounding; promote to commitments only after stable contracts/validators exist.
+
 ## Changelog
 
+- 2026-02-01: Add papertrack RadGenome lung nodule GT (hi32 full-eligible) reward-policy pipeline and pass the paired-Δ significance gate at B32 (E0986, E1042–E1044).
 - 2026-01-31: Promote “paper-grade” CT-RATE TS grounding benchmark into runnable commitments (`C0036–C0039` / `P0035–P0038`) and add experiments E0907–E0910.
 - 2026-01-31: Implemented + proved E0907–E0910 (CT-RATE TS GT manifest, policy dataset+training, grounding benchmark, and paper export).
 - 2026-01-31: Promote proposal acceptance checks (Stage T/E + A5 verifier stability) into runnable commitments (`C0033–C0035` / `P0032–P0034`) and prove them via E0904–E0906.

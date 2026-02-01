@@ -1,5 +1,5 @@
 # Proof Audit
-Generated at (UTC): `2026-01-31T17:32:09.422566+00:00`
+Generated at (UTC): `2026-02-01T19:29:19.671532+00:00`
 
 ## Inputs
 - plan: `docs/plan.md`
@@ -7,8 +7,8 @@ Generated at (UTC): `2026-01-31T17:32:09.422566+00:00`
 - results_dir: `.rd_queue/results`
 
 ## Summary
-- total_claims: **49**
-- proved: **49**
+- total_claims: **53**
+- proved: **53**
 - not_proved: **0**
 
 ## Claims
@@ -63,6 +63,10 @@ Generated at (UTC): `2026-01-31T17:32:09.422566+00:00`
 | C0104 | Effusion pseudo-GT manifests (pleural/pericardial) can be built from CT-RATE valid volumes + TotalSeg masks with non-empty GT boxes. | E0922, E0923 | Y/Y | Y/Y | PROVED |
 | C0105 | Effusion policy datasets (pleural/pericardial, split=train) can be built from GT boxes into a runnable dataset.jsonl. | E0924, E0925 | Y/Y | Y/Y | PROVED |
 | C0106 | Effusion policy training + grounding benchmark (split=val) runs fixed/heuristic/learned across budgets and emits non-empty metrics+summary. | E0926, E0927 | Y/Y | Y/Y | PROVED |
+| C0107 | Papertrack (GT): RadGenome-ChestCT lung nodule (hi32 token-space) manifest can be built for full-eligible cases with non-empty GT boxes and deterministic splits. | E0986 | Y/Y | Y/Y | PROVED |
+| C0108 | Papertrack (GT): Torch reward-policy training (STOP action; reward regression) writes reusable checkpoints with `model.pt` and non-default weights (multi-seed). | E1042 | Y/Y | Y/Y | PROVED |
+| C0109 | Papertrack (GT): RadGenome lung nodule grounding benchmark (reward stop-threshold) runs fixed/heuristic/learned/random/oracle across budgets and emits deterministic summaries (multi-seed). | E1043 | Y/Y | Y/Y | PROVED |
+| C0110 | Papertrack (GT): Learned policy achieves a statistically significant improvement over random at budget 32 on RadGenome lung nodule grounding (ΔIoU >= 0.017 and paired Δ CI_low >= 0). | E1044 | Y/Y | Y/Y | PROVED |
 
 ## Not Proved
 

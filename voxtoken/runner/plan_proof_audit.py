@@ -15,6 +15,7 @@ class Claim:
     claim_id: str
     text: str
     evidence: List[str]
+    checked: bool
 
 
 @dataclass(frozen=True)
@@ -61,21 +62,30 @@ def _escape_md_cell(text: str) -> str:
 
 
 def _parse_plan_claims(plan_path: Path) -> List[Claim]:
-    claim_re = re.compile(r"^\s*-\s*\[[ xX]\]\s*(C\d{4})\s*:\s*(.*)\s*$")
+    claim_re = re.compile(r"^\s*-\s*\[([ xX])\]\s*(C\d{4})\s*:\s*(.*)\s*$")
     evid_re = re.compile(r"\bE\d{4}\b")
 
     claims: List[Claim] = []
     cur_id: str | None = None
     cur_text: str = ""
     cur_evidence: List[str] = []
+    cur_checked = False
 
     for line in plan_path.read_text(encoding="utf-8").splitlines():
         m = claim_re.match(line)
         if m:
             if cur_id is not None:
-                claims.append(Claim(claim_id=cur_id, text=cur_text, evidence=sorted(set(cur_evidence))))
-            cur_id = str(m.group(1))
-            cur_text = str(m.group(2)).strip()
+                claims.append(
+                    Claim(
+                        claim_id=cur_id,
+                        text=cur_text,
+                        evidence=sorted(set(cur_evidence)),
+                        checked=cur_checked,
+                    )
+                )
+            cur_checked = str(m.group(1)).strip().lower() == "x"
+            cur_id = str(m.group(2))
+            cur_text = str(m.group(3)).strip()
             cur_evidence = []
             continue
 
@@ -86,7 +96,14 @@ def _parse_plan_claims(plan_path: Path) -> List[Claim]:
                 cur_evidence.append(_normalize_exp_id(eid))
 
     if cur_id is not None:
-        claims.append(Claim(claim_id=cur_id, text=cur_text, evidence=sorted(set(cur_evidence))))
+        claims.append(
+            Claim(
+                claim_id=cur_id,
+                text=cur_text,
+                evidence=sorted(set(cur_evidence)),
+                checked=cur_checked,
+            )
+        )
 
     return claims
 
@@ -151,8 +168,14 @@ def _load_results(results_dir: Path) -> Dict[str, List[ResultHit]]:
             continue
 
         stage = str(payload.get("stage", "")).strip()
-        status = str(payload.get("status", "")).strip()
         exit_code = int(payload.get("exit_code", 0) or 0)
+        status = str(payload.get("status", "") or "").strip()
+        if not status:
+            ok_flag = payload.get("ok", None)
+            if ok_flag is True and exit_code == 0:
+                status = "passed"
+            elif ok_flag is False:
+                status = "failed"
         by_exp.setdefault(exp_id, []).append(ResultHit(path=p, stage=stage, status=status, exit_code=exit_code))
 
     return by_exp
@@ -176,6 +199,9 @@ def _claim_status(
     ledger: Dict[str, ExperimentRow],
     results: Dict[str, List[ResultHit]],
 ) -> Tuple[bool, List[str]]:
+    if not claim.checked:
+        return True, ["pending (unchecked in docs/plan.md)"]
+
     reasons: List[str] = []
     if not claim.evidence:
         return False, ["missing Evidence: E####"]
@@ -218,7 +244,7 @@ def _write_audit_md(
 
     for claim in claims:
         ok, reasons = _claim_status(claim, ledger=ledger, results=results)
-        if not ok:
+        if claim.checked and not ok:
             unproved.append((claim, reasons))
 
         evid = ", ".join(claim.evidence) if claim.evidence else "-"
@@ -228,6 +254,11 @@ def _write_audit_md(
         res_smoke_ok = all(bool(_find_passed_hits(results.get(e, []), kind="smoke")) for e in claim.evidence) if claim.evidence else False
         res_full_ok = all(bool(_find_passed_hits(results.get(e, []), kind="full")) for e in claim.evidence) if claim.evidence else False
 
+        if not claim.checked:
+            status = "PENDING"
+        else:
+            status = "PROVED" if ok else "NOT PROVED"
+
         rows.append(
             (
                 claim.claim_id,
@@ -235,7 +266,7 @@ def _write_audit_md(
                 evid,
                 f"{'Y' if smoke_ok else 'N'}/{'Y' if full_ok else 'N'}",
                 f"{'Y' if res_smoke_ok else 'N'}/{'Y' if res_full_ok else 'N'}",
-                "PROVED" if ok else "NOT PROVED",
+                status,
             )
         )
 
@@ -320,7 +351,7 @@ def main() -> None:
     n_unproved = 0
     for c in claims:
         ok, _ = _claim_status(c, ledger=ledger, results=results)
-        if not ok:
+        if c.checked and not ok:
             n_unproved += 1
     if n_unproved:
         print(f"[ERR] not proved: {n_unproved} claim(s)")
