@@ -97,12 +97,24 @@ def _fit_linear_weights(xs: List[List[float]], ys: List[float], *, ridge: float)
     return weights, meta
 
 
-def _load_dataset_jsonl(path: Path, *, max_samples: int, input_dim: int) -> Tuple[List[List[float]], List[float]]:
+def _load_dataset_jsonl(
+    path: Path,
+    *,
+    max_samples: int,
+    input_dim: int,
+    loss: str,
+    label_key: str,
+) -> Tuple[List[List[float]], List[float], List[float]]:
     xs: List[List[float]] = []
-    ys: List[float] = []
+    train_ys: List[float] = []
+    reward_ys: List[float] = []
     input_dim = int(input_dim)
     if int(input_dim) < 4:
         raise ValueError(f"model.input_dim must be >=4 (got {input_dim})")
+    loss_norm = str(loss or "mse").strip().lower() or "mse"
+    if loss_norm not in {"mse", "bce"}:
+        raise ValueError(f"train.loss must be one of: mse|bce (got {loss!r})")
+    label_key = str(label_key or "label").strip() or "label"
     n = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -127,18 +139,25 @@ def _load_dataset_jsonl(path: Path, *, max_samples: int, input_dim: int) -> Tupl
                 x.append(float(obj.get("mean_intensity", 0.0)))
             if int(input_dim) >= 9:
                 x.append(float(obj.get("max_intensity", 0.0)))
+            if int(input_dim) >= 10:
+                x.append(float(obj.get("level", 0.0)))
             if len(x) < int(input_dim):
                 x = x + [0.0 for _ in range(int(input_dim) - len(x))]
             x = x[: int(input_dim)]
-            y = float(obj.get("reward", 0.0))
+            reward = float(obj.get("reward", 0.0))
+            if loss_norm == "bce":
+                y = float(obj.get(label_key, 0.0))
+            else:
+                y = float(reward)
         except Exception:
             continue
         xs.append(x)
-        ys.append(float(y))
+        train_ys.append(float(y))
+        reward_ys.append(float(reward))
         n += 1
         if int(max_samples) > 0 and n >= int(max_samples):
             break
-    return xs, ys
+    return xs, train_ys, reward_ys
 
 
 def _dist_info() -> Tuple[int, int, int]:
@@ -183,6 +202,9 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
     weight_decay = float(train_cfg.get("weight_decay", 0.0))
     ridge = float(train_cfg.get("ridge", 1e-6))
     max_samples = int(train_cfg.get("max_samples", 0))
+    loss_name = str(train_cfg.get("loss", "mse")).strip().lower() or "mse"
+    label_key = str(train_cfg.get("label_key", "label")).strip() or "label"
+    pos_weight = float(train_cfg.get("pos_weight", 1.0))
 
     fp16 = bool(ddp_cfg.get("fp16", False))
     backend = str(ddp_cfg.get("backend", "nccl")).strip().lower() or "nccl"
@@ -205,7 +227,13 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
         torch.cuda.manual_seed_all(int(seed) + int(rank))
 
     input_dim = int(model_cfg.get("input_dim", 4))
-    xs, ys = _load_dataset_jsonl(dataset_jsonl, max_samples=int(max_samples), input_dim=int(input_dim))
+    xs, ys, reward_ys = _load_dataset_jsonl(
+        dataset_jsonl,
+        max_samples=int(max_samples),
+        input_dim=int(input_dim),
+        loss=str(loss_name),
+        label_key=str(label_key),
+    )
     if not xs:
         raise ValueError("dataset_jsonl is empty or unreadable")
 
@@ -245,7 +273,10 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
         model = DDP(model, device_ids=[int(local_rank)] if device.type == "cuda" else None)
 
     opt = torch.optim.Adam(model.parameters(), lr=float(lr), weight_decay=float(weight_decay))
-    loss_fn = torch.nn.MSELoss()
+    if str(loss_name) == "bce":
+        loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([float(pos_weight)], dtype=torch.float32, device=device))
+    else:
+        loss_fn = torch.nn.MSELoss()
 
     scaler = torch.cuda.amp.GradScaler(enabled=bool(fp16 and device.type == "cuda"))
     autocast = torch.cuda.amp.autocast
@@ -291,6 +322,8 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
                     "timestamp_utc": _utc_now_iso(),
                     "epoch": int(epoch),
                     "loss_mse": float(mean_loss),
+                    "loss": str(loss_name),
+                    "pos_weight": float(pos_weight),
                     "n_samples": int(total_n),
                     "seed": int(seed),
                     "world_size": int(world_size),
@@ -313,7 +346,8 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
             state_dict = model.state_dict()
         torch.save(dict(state_dict), str(model_path))
 
-        weights, fit_meta = _fit_linear_weights(xs, ys, ridge=float(ridge))
+        # Keep `weights` on reward for backward-compatible heuristic scoring, even when training uses BCE labels.
+        weights, fit_meta = _fit_linear_weights(xs, reward_ys, ridge=float(ridge))
         fit_meta = {"fit": "dataset", "dataset_jsonl": str(dataset_jsonl), **dict(fit_meta)}
 
         checkpoint = {

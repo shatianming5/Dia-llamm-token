@@ -420,9 +420,9 @@ def build_radgenome_mask_manifest(
     n_quota_skip = 0
 
     def cap_reached(name: str, cap: int) -> bool:
-        # cap<=0 means "unlimited / don't require".
+        # cap<=0 means "no limit": it is never "reached" for early-stop purposes.
         if int(cap) <= 0:
-            return True
+            return False
         return int(counts_written.get(name, 0)) >= int(cap)
 
     def done() -> bool:
@@ -436,8 +436,20 @@ def build_radgenome_mask_manifest(
                 cap = int(max_cases_val)
             else:
                 cap = int(max_cases_test)
+            # If cap<=0: no early-stop for this split.
             return cap_reached(split_norm, cap)
-        return cap_reached("train", int(max_cases_train)) and cap_reached("val", int(max_cases_val)) and cap_reached("test", int(max_cases_test))
+
+        # Early-stop only when at least one split has an explicit positive cap,
+        # and all such capped splits have reached their quotas.
+        caps = {
+            "train": int(max_cases_train),
+            "val": int(max_cases_val),
+            "test": int(max_cases_test),
+        }
+        required = {k: v for k, v in caps.items() if int(v) > 0}
+        if not required:
+            return False
+        return all(cap_reached(k, v) for k, v in required.items())
 
     # Scan the tar shards in order and accept the first cases we can resolve+extract,
     # to avoid seeking for specific case_ids (which would require scanning huge shards).

@@ -1,0 +1,29 @@
+# Train policy config (torch/DDP) (oracle imitation) (RadGenome-ChestCT: lung nodule, full-eligible) (E0951 seed2)
+
+run_id: E0951_seed2
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/radgenome_policy_dataset_oracle_lung_nodule_full_eligible_e0950/dataset.jsonl
+
+seed: 2
+
+ddp:
+  backend: nccl
+  fp16: false
+
+train:
+  epochs: 200
+  batch_size: 256
+  lr: 1.0e-3
+  weight_decay: 0.0
+  ridge: 1.0e-6
+  loss: bce
+  label_key: label
+  pos_weight: 10.0
+
+model:
+  # 4 base features + xyz centers + mean/max intensity + level
+  input_dim: 10
+  hidden_dims: [128, 128]
+  activation: relu
+

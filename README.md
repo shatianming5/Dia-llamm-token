@@ -149,6 +149,14 @@ python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0933_0935.json --ov
 # 可通过 NPROC_PER_NODE 控制 torchrun 进程数（默认 1）
 python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0940_0944_smoke.json --overwrite
 python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0940_0944_full.json --overwrite
+
+# 例：oracle-imitation policy（E0945–E0948；基于 E0941 的 nodule pseudo-GT 生成 oracle trajectories 并训练 split policy）
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0945_0948_smoke.json --overwrite
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0945_0948_full.json --overwrite
+
+# 例：full-eligible nodule（E0949–E0953；去掉 E0941 的 max-cases 上限，覆盖所有可解析的 nodule masks）
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0949_0953_smoke.json --overwrite
+python -m voxtoken.runner.run_queue --queue .rd_queue/queue_e0949_0953_full.json --overwrite
 ```
 
 paper-track（RadGenome lung nodule）关键产物：
@@ -157,11 +165,19 @@ paper-track（RadGenome lung nodule）关键产物：
 - `outputs/train_policy/E0942_seed{0,1,2}/checkpoint.json` + `model.pt`：learned split policy（torch）
 - `artifacts/e0943_benchmark_radgenome_lung_nodule_seed{0,1,2}/summary.json`：multi-seed benchmark 汇总
 - `artifacts/paper_e0944_radgenome_lung_nodule/table1_main_ci.csv`：主表（multi-seed bootstrap CI）
+- `artifacts/paper_e0948_radgenome_lung_nodule_oracle_policy/table1_main_ci.csv`：oracle-imitation policy 主表（train=400/val=100）
+- `artifacts/radgenome_gt_lung_nodule_full_eligible_e0949/summary.json`：full-eligible GT-box manifest 统计（train/val counts）
+- `artifacts/paper_e0953_radgenome_lung_nodule_oracle_policy_full_eligible/table1_main_ci.csv`：full-eligible oracle-imitation policy 主表（multi-seed bootstrap CI）
 
 参考结果（RadGenome lung nodule，val n=100，full run 于 2026-01-31 产出）：
 
 - budget_B=32：learned mean IoU=0.1128（CI≈[0.0979, 0.1270]），random=0.1133（≈[0.0987, 0.1278]），heuristic=0.1104（≈[0.0965, 0.1255]），oracle=0.1776（≈[0.1658, 0.1896]）
 - 结论：learned 与 random/heuristic **几乎持平**（差异在 1e-3 量级，CI 明显重叠），但与 oracle 仍有显著 gap，说明“token split 选择策略”仍有大量可挖掘空间
+
+参考结果（RadGenome lung nodule full-eligible，val n=126，full run 于 2026-02-01 产出）：
+
+- budget_B=32：learned mean IoU=0.1126（CI≈[0.0987, 0.1274]），random=0.1164（≈[0.1026, 0.1307]），oracle=0.1788（≈[0.1663, 0.1909]）
+- 结论：learned 仍未超过 random（差异约 3.8e-3），与 oracle 仍有显著 gap（“split policy 特征/建模”不足仍是主瓶颈）
 
 ### 4.4 split 与 seed（对齐 plan）
 

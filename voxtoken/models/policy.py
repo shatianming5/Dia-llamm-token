@@ -97,6 +97,8 @@ class SplitPolicy(Module):
                     base.append(float(getattr(f, "mean_intensity", 0.0)))
                 if dim >= 9:
                     base.append(float(getattr(f, "max_intensity", 0.0)))
+                if dim >= 10:
+                    base.append(float(getattr(f, "level", 0.0)))
                 return base[:dim] + [0.0 for _ in range(max(0, dim - len(base)))]
 
             x = torch.tensor([vec(f) for f in feats], dtype=torch.float32)
