@@ -1,0 +1,34 @@
+# CT-RATE TS grounding benchmark config (hi32 token space; seq3 refinement + score-threshold STOP) (E1039+)
+#
+# Motivation:
+# The benchmark metric is max IoU over *single* tokens vs GT boxes. Splitting a token can
+# *decrease* this max IoU because the parent is removed. The oracle stops when no split has
+# positive marginal gain. For policies trained to regress marginal reward (IoU improvement),
+# we can approximate this by stopping when the best predicted score <= 0.
+
+volume:
+  target_shape_cdhw: [1, 32, 32, 32]
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 16
+    max_levels: 3
+
+refine:
+  # Sequential refinement: one split per round, multiple rounds.
+  max_rounds: 4
+  max_splits_per_round: 1
+  # Avoid selecting non-splittable tokens (prevents premature no-op termination).
+  filter_invalid_splits: true
+  # Stop if best (valid) split score <= threshold. Intended for reward-regression policies.
+  stop_score_threshold: 0.0
+
+policy:
+  mode: heuristic
+  weights:
+    recon_error: 1.0
+    evidence_entropy: 1.0
+    citation_pressure: 0.0
+    history_splits: -1.0
+

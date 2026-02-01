@@ -1,0 +1,31 @@
+# CT-RATE TS grounding benchmark config (hi32 token space; seq3 refinement + learned STOP action) (E1027+)
+#
+# This variant enables a learned STOP action candidate (token_id=-1) so the policy can
+# stop splitting before exhausting the budget, closer to the oracle behavior.
+
+volume:
+  target_shape_cdhw: [1, 32, 32, 32]
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 16
+    max_levels: 3
+
+refine:
+  # Sequential refinement: one split per round, multiple rounds.
+  max_rounds: 4
+  max_splits_per_round: 1
+  # Enable STOP action for learned policy selection.
+  enable_stop_action: true
+  # Avoid selecting non-splittable tokens (prevents premature no-op termination).
+  filter_invalid_splits: true
+
+policy:
+  mode: heuristic
+  weights:
+    recon_error: 1.0
+    evidence_entropy: 1.0
+    citation_pressure: 0.0
+    history_splits: -1.0
+

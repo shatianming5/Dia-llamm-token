@@ -90,7 +90,9 @@ class SplitPolicy(Module):
         """Returns (token_id, score)."""
         if self.use_torch and torch is not None and self.torch_model is not None and feats:
             dim = int(getattr(self, "torch_input_dim", 4) or 4)
-            dim = max(4, min(16, int(dim)))
+            # Keep this in sync with train_policy_torch._extract_feature_vector().
+            # We support additive growth in feature dims for new experiments.
+            dim = max(4, min(32, int(dim)))
             fn = getattr(self, "torch_feature_norm", None)
             mean = None
             std = None
@@ -132,6 +134,10 @@ class SplitPolicy(Module):
                     base.append(float(getattr(f, "step_idx", 0.0)))
                 if dim >= 16:
                     base.append(float(getattr(f, "budget_B", 0.0)))
+                if dim >= 17:
+                    base.append(float(getattr(f, "mean_intensity_z", 0.0)))
+                if dim >= 18:
+                    base.append(float(getattr(f, "max_intensity_z", 0.0)))
                 v = base[:dim] + [0.0 for _ in range(max(0, dim - len(base)))]
                 if mean is not None and std is not None:
                     v = [(float(v[i]) - float(mean[i])) / float(std[i]) for i in range(int(dim))]

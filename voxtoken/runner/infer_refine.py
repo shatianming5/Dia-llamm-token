@@ -258,6 +258,31 @@ class RefineRunner:
                     budget_B=int(budget_B),
                 )
             )
+        # Add per-step intensity z features (computed from token partition statistics).
+        if feats:
+            w_sum = 0.0
+            w_mean = 0.0
+            w_e2 = 0.0
+            for f in feats:
+                w = float(getattr(f, "box_volume_mm3", 0.0) or 0.0)
+                if not (w > 0.0):
+                    w = 1.0
+                mu_i = float(getattr(f, "mean_intensity", 0.0) or 0.0)
+                var_i = float(getattr(f, "recon_error", 0.0) or 0.0)
+                w_sum += float(w)
+                w_mean += float(w) * float(mu_i)
+                w_e2 += float(w) * (float(var_i) + float(mu_i) * float(mu_i))
+            if w_sum > 0.0:
+                mu = float(w_mean) / float(w_sum)
+                e2 = float(w_e2) / float(w_sum)
+                var = max(0.0, float(e2) - float(mu) * float(mu))
+                std = float((float(var) + 1.0e-6) ** 0.5)
+                for f in feats:
+                    m = float(getattr(f, "mean_intensity", 0.0) or 0.0)
+                    mx = float(getattr(f, "max_intensity", 0.0) or 0.0)
+                    f.mean_intensity_z = float(m - float(mu)) / float(std)
+                    f.max_intensity_z = float(mx - float(mu)) / float(std)
+
         return feats
 
     def _select_splits(self, feats: List[TokenFeatures], budget_left: int) -> Sequence[int]:

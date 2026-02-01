@@ -3,7 +3,7 @@
 本仓库是 `docs/plan.md` 中 **VoxToken++：Budgeted Adaptive 3D Tokenization for Proof-Carrying CT Reporting** 的工程化落地骨架：先把**模块边界、数据结构、类/函数接口、产物契约**固定下来，再逐步填充训练/推理实现与实验矩阵。`docs/plan.md` 同时包含 proposal、实现方案（A）与实验方案（B）的最小不可分拆解。
 
 当前状态：**M0→M1（最小推理闭环已打通）**  
-已提供可运行的 `smoke` / `unified_eval`（用于固定“产物结构/指标 schema/命令入口”），以及最小可运行的 `infer_refine`（fixed-grid tokenizer + rule-based generator + verifier gate）。训练仍为占位实现（仅落盘 outputs 契约，不做真实学习）。
+已提供可运行的 `smoke` / `unified_eval`（用于固定“产物结构/指标 schema/命令入口”），以及最小可运行的 `infer_refine`（fixed-grid tokenizer + rule-based generator + verifier gate）。同时，RadGenome lung nodule grounding track 的 split policy（torch）训练与 multi-seed 评测闭环已可运行并通过显著性门槛（见 `docs/experiment.md` 的 E1042–E1044）。
 
 ---
 
@@ -177,6 +177,7 @@ paper-track（RadGenome lung nodule）关键产物：
 
 - **Batched refine (hi32; E0992)**：budget_B=32 learned mean IoU=0.1239（CI≈[0.1078, 0.1415]），random=0.1107（≈[0.0968, 0.1246]），Δ=+0.0132；paired Δ CI≈[0.0060, 0.0204]（显著 > 0）
 - **Sequential refine (hi32 seq3; E1013)**：budget_B=32 learned mean IoU=0.1136（CI≈[0.0991, 0.1292]），random=0.0980（≈[0.0853, 0.1110]），Δ=+0.0156；paired Δ CI≈[0.0066, 0.0251]（显著 > 0）
+- **Sequential refine + reward-stop-threshold (hi32 seq3; E1044)**：budget_B=32 learned mean IoU=0.1232（CI≈[0.1070, 0.1404]），random=0.0980（≈[0.0853, 0.1110]），Δ=+0.0253；paired Δ CI≈[0.0142, 0.0362]（显著 > 0）
 - 备注：单独看 “learned/random 各自的 CI 是否重叠” 并不能判断差异是否显著；这里用的是 **paired bootstrap over per-case deltas**（见 `voxtoken/runner/validate_paired_delta_ci.py`）
 
 ### 4.4 split 与 seed（对齐 plan）

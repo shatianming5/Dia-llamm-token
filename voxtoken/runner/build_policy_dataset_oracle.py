@@ -16,6 +16,45 @@ from .infer_refine import _load_volume_for_manifest_row  # repo-skeleton reuse
 
 Box = Tuple[float, float, float, float, float, float]  # x0,x1,y0,y1,z0,z1 (mm)
 
+STOP_TOKEN_ID = -1
+_STOP_META_KEYS = {"case_id", "budget_B", "step_idx", "token_id", "label", "reward"}
+
+
+def _make_stop_candidate_row(
+    rows_step: List[Dict[str, Any]],
+    *,
+    case_id: str,
+    budget_B: int,
+    step_idx: int,
+    label: int,
+) -> Dict[str, Any] | None:
+    if not rows_step:
+        return None
+    sums: Dict[str, float] = {}
+    counts: Dict[str, int] = {}
+    for r in rows_step:
+        for k, v in r.items():
+            if k in _STOP_META_KEYS:
+                continue
+            if not isinstance(v, (int, float)):
+                continue
+            sums[k] = float(sums.get(k, 0.0)) + float(v)
+            counts[k] = int(counts.get(k, 0)) + 1
+
+    out: Dict[str, Any] = {
+        "case_id": str(case_id),
+        "budget_B": int(budget_B),
+        "step_idx": int(step_idx),
+        "token_id": int(STOP_TOKEN_ID),
+        "reward": 0.0,
+        "label": int(label),
+    }
+    for k, s in sums.items():
+        n = int(counts.get(k, 0))
+        if n > 0:
+            out[k] = float(s) / float(n)
+    return out
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -220,6 +259,7 @@ def build_policy_dataset_oracle(
     budgets: List[int],
     max_cases: int,
     seed: int,
+    include_stop: bool,
 ) -> Dict[str, Any]:
     rows = _load_jsonl(manifest_jsonl)
     rows.sort(key=lambda r: str(r.get("case_id", "")).strip())
@@ -309,32 +349,79 @@ def build_policy_dataset_oracle(
                     elif abs(float(impr) - float(best_impr)) <= 1e-12 and best_pid is not None and int(pid) < int(best_pid):
                         best_pid = int(pid)
 
-                if best_pid is None or float(best_impr) <= 0.0:
+                is_terminal = bool(best_pid is None or float(best_impr) <= 0.0)
+                target_pid = int(STOP_TOKEN_ID) if is_terminal else int(best_pid)
+                if is_terminal and not include_stop:
                     break
 
                 # Emit one-vs-rest labels for this step (single positive best_pid).
+                # First pass: featurize (needed to compute per-step intensity z-scores).
+                rows_step: List[Dict[str, Any]] = []
+                w_sum = 0.0
+                w_mean = 0.0
+                w_e2 = 0.0
                 for t in tk:
                     pid = int(t.token_id)
-                    label = int(pid == int(best_pid))
+                    label = int(pid == int(target_pid))
                     if label:
                         n_pos += 1
                     else:
                         n_neg += 1
                     feats = _token_feature_vector(t, volume=volume, voxel_spacing_mm=spacing)
-                    out_lines.append(
-                        json.dumps(
-                            {
-                                "case_id": str(case_id),
-                                "budget_B": int(budget_B),
-                                "step_idx": int(step_idx),
-                                "token_id": int(pid),
-                                **feats,
-                                "reward": float(token_rewards.get(pid, 0.0)),
-                                "label": int(label),
-                            },
-                            ensure_ascii=False,
-                        )
+
+                    # Per-step global intensity stats from token partition (law of total variance).
+                    w = float(feats.get("box_volume_mm3", 0.0) or 0.0)
+                    if not (w > 0.0):
+                        w = 1.0
+                    mu_i = float(feats.get("mean_intensity", 0.0) or 0.0)
+                    var_i = float(feats.get("recon_error", 0.0) or 0.0)
+                    w_sum += float(w)
+                    w_mean += float(w) * float(mu_i)
+                    w_e2 += float(w) * (float(var_i) + float(mu_i) * float(mu_i))
+
+                    rows_step.append(
+                        {
+                            "case_id": str(case_id),
+                            "budget_B": int(budget_B),
+                            "step_idx": int(step_idx),
+                            "token_id": int(pid),
+                            **feats,
+                            "reward": float(token_rewards.get(pid, 0.0)),
+                            "label": int(label),
+                        }
                     )
+
+                mu = 0.0
+                std = 1.0
+                if w_sum > 0.0:
+                    mu = float(w_mean) / float(w_sum)
+                    e2 = float(w_e2) / float(w_sum)
+                    var = max(0.0, float(e2) - float(mu) * float(mu))
+                    std = float((float(var) + 1.0e-6) ** 0.5)
+                for r in rows_step:
+                    m = float(r.get("mean_intensity", 0.0) or 0.0)
+                    mx = float(r.get("max_intensity", 0.0) or 0.0)
+                    r["mean_intensity_z"] = float(m - float(mu)) / float(std)
+                    r["max_intensity_z"] = float(mx - float(mu)) / float(std)
+                    out_lines.append(json.dumps(r, ensure_ascii=False))
+
+                if include_stop:
+                    stop_row = _make_stop_candidate_row(
+                        rows_step,
+                        case_id=str(case_id),
+                        budget_B=int(budget_B),
+                        step_idx=int(step_idx),
+                        label=int(target_pid == int(STOP_TOKEN_ID)),
+                    )
+                    if stop_row is not None:
+                        out_lines.append(json.dumps(stop_row, ensure_ascii=False))
+                        if int(stop_row.get("label", 0) or 0) == 1:
+                            n_pos += 1
+                        else:
+                            n_neg += 1
+
+                if is_terminal:
+                    break
 
                 tk2, executed = _refine_select(pyramid, tk, [int(best_pid)], int(budget_B))
                 if not executed or len(tk2) == len(tk):
@@ -379,6 +466,11 @@ def main() -> None:
     parser.add_argument("--budgets", type=int, nargs="+", default=[16, 32], help="Budgets to generate trajectories for")
     parser.add_argument("--max-cases", type=int, default=0, help="Max cases to process (0 = no limit)")
     parser.add_argument("--seed", type=int, default=0, help="Seed (logged for reproducibility; does not randomize selection)")
+    parser.add_argument(
+        "--include-stop",
+        action="store_true",
+        help="Add a STOP action candidate (token_id=-1) for each step and emit a terminal stop step when no positive split remains.",
+    )
     args = parser.parse_args()
 
     cfg_path = Path(args.config)
@@ -402,6 +494,7 @@ def main() -> None:
             budgets=[int(b) for b in list(args.budgets or [])],
             max_cases=int(args.max_cases),
             seed=int(args.seed),
+            include_stop=bool(args.include_stop),
         )
     except Exception as exc:  # noqa: BLE001
         print(f"[ERR] {exc}", file=sys.stderr)

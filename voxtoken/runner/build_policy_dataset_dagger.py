@@ -16,6 +16,47 @@ from .infer_refine import _load_volume_for_manifest_row  # repo-skeleton reuse
 
 Box = Tuple[float, float, float, float, float, float]  # x0,x1,y0,y1,z0,z1 (mm)
 
+STOP_TOKEN_ID = -1
+_STOP_META_KEYS = {"case_id", "orig_case_id", "budget_B", "step_idx", "token_id", "label", "reward"}
+
+
+def _make_stop_candidate_row(
+    rows_step: List[Dict[str, Any]],
+    *,
+    case_id: str,
+    orig_case_id: str,
+    budget_B: int,
+    step_idx: int,
+    label: int,
+) -> Dict[str, Any] | None:
+    if not rows_step:
+        return None
+    sums: Dict[str, float] = {}
+    counts: Dict[str, int] = {}
+    for r in rows_step:
+        for k, v in r.items():
+            if k in _STOP_META_KEYS:
+                continue
+            if not isinstance(v, (int, float)):
+                continue
+            sums[k] = float(sums.get(k, 0.0)) + float(v)
+            counts[k] = int(counts.get(k, 0)) + 1
+
+    out: Dict[str, Any] = {
+        "case_id": str(case_id),
+        "orig_case_id": str(orig_case_id),
+        "budget_B": int(budget_B),
+        "step_idx": int(step_idx),
+        "token_id": int(STOP_TOKEN_ID),
+        "reward": 0.0,
+        "label": int(label),
+    }
+    for k, s in sums.items():
+        n = int(counts.get(k, 0))
+        if n > 0:
+            out[k] = float(s) / float(n)
+    return out
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -251,6 +292,7 @@ def build_policy_dataset_dagger(
     seed: int,
     policy_ckpt: str,
     case_id_suffix: str,
+    include_stop: bool,
 ) -> Dict[str, Any]:
     rows = _load_jsonl(manifest_jsonl)
     rows.sort(key=lambda r: str(r.get("case_id", "")).strip())
@@ -343,23 +385,38 @@ def build_policy_dataset_dagger(
                     elif abs(float(impr) - float(best_impr)) <= 1e-12 and best_pid is not None and int(pid) < int(best_pid):
                         best_pid = int(pid)
 
-                if best_pid is None or float(best_impr) <= 0.0:
+                is_terminal = bool(best_pid is None or float(best_impr) <= 0.0)
+                target_pid = int(STOP_TOKEN_ID) if is_terminal else int(best_pid)
+                if is_terminal and not include_stop:
                     break
 
                 # Featurize once: used for both dataset emission and policy rollout.
-                feats_by_tid: Dict[int, Dict[str, Any]] = {}
                 policy_feats: List[Any] = []
+                rows_step: List[Dict[str, Any]] = []
                 from ..schemas import TokenFeatures
+
+                w_sum = 0.0
+                w_mean = 0.0
+                w_e2 = 0.0
 
                 for t in tk:
                     pid = int(t.token_id)
-                    label = int(pid == int(best_pid))
+                    label = int(pid == int(target_pid))
                     if label:
                         n_pos += 1
                     else:
                         n_neg += 1
                     feats = _token_feature_vector(t, volume=volume, voxel_spacing_mm=spacing)
-                    feats_by_tid[int(pid)] = dict(feats)
+
+                    w = float(feats.get("box_volume_mm3", 0.0) or 0.0)
+                    if not (w > 0.0):
+                        w = 1.0
+                    mu_i = float(feats.get("mean_intensity", 0.0) or 0.0)
+                    var_i = float(feats.get("recon_error", 0.0) or 0.0)
+                    w_sum += float(w)
+                    w_mean += float(w) * float(mu_i)
+                    w_e2 += float(w) * (float(var_i) + float(mu_i) * float(mu_i))
+
                     policy_feats.append(
                         TokenFeatures(
                             token_id=int(pid),
@@ -381,21 +438,58 @@ def build_policy_dataset_dagger(
                             budget_B=int(budget_B),
                         )
                     )
-                    out_lines.append(
-                        json.dumps(
-                            {
-                                "case_id": str(case_id_out),
-                                "orig_case_id": str(case_id),
-                                "budget_B": int(budget_B),
-                                "step_idx": int(step_idx),
-                                "token_id": int(pid),
-                                **feats,
-                                "reward": float(token_rewards.get(pid, 0.0)),
-                                "label": int(label),
-                            },
-                            ensure_ascii=False,
-                        )
+
+                    rows_step.append(
+                        {
+                            "case_id": str(case_id_out),
+                            "orig_case_id": str(case_id),
+                            "budget_B": int(budget_B),
+                            "step_idx": int(step_idx),
+                            "token_id": int(pid),
+                            **feats,
+                            "reward": float(token_rewards.get(pid, 0.0)),
+                            "label": int(label),
+                        }
                     )
+
+                mu = 0.0
+                std = 1.0
+                if w_sum > 0.0:
+                    mu = float(w_mean) / float(w_sum)
+                    e2 = float(w_e2) / float(w_sum)
+                    var = max(0.0, float(e2) - float(mu) * float(mu))
+                    std = float((float(var) + 1.0e-6) ** 0.5)
+                for f in policy_feats:
+                    m = float(getattr(f, "mean_intensity", 0.0) or 0.0)
+                    mx = float(getattr(f, "max_intensity", 0.0) or 0.0)
+                    f.mean_intensity_z = float(m - float(mu)) / float(std)
+                    f.max_intensity_z = float(mx - float(mu)) / float(std)
+
+                for r in rows_step:
+                    m = float(r.get("mean_intensity", 0.0) or 0.0)
+                    mx = float(r.get("max_intensity", 0.0) or 0.0)
+                    r["mean_intensity_z"] = float(m - float(mu)) / float(std)
+                    r["max_intensity_z"] = float(mx - float(mu)) / float(std)
+                    out_lines.append(json.dumps(r, ensure_ascii=False))
+
+                if include_stop:
+                    stop_row = _make_stop_candidate_row(
+                        rows_step,
+                        case_id=str(case_id_out),
+                        orig_case_id=str(case_id),
+                        budget_B=int(budget_B),
+                        step_idx=int(step_idx),
+                        label=int(target_pid == int(STOP_TOKEN_ID)),
+                    )
+                    if stop_row is not None:
+                        out_lines.append(json.dumps(stop_row, ensure_ascii=False))
+                        if int(stop_row.get("label", 0) or 0) == 1:
+                            n_pos += 1
+                        else:
+                            n_neg += 1
+
+                if is_terminal:
+                    break
 
                 # Take the next action from the current policy (DAgger rollout).
                 scored = pol.score(list(policy_feats))
@@ -449,6 +543,11 @@ def main() -> None:
     parser.add_argument("--max-cases", type=int, default=0, help="Max cases to process (0 = no limit)")
     parser.add_argument("--seed", type=int, default=0, help="Seed for deterministic ordering/selection (future use)")
     parser.add_argument(
+        "--include-stop",
+        action="store_true",
+        help="Add a STOP action candidate (token_id=-1) for each step and emit a terminal stop step when no positive split remains.",
+    )
+    parser.add_argument(
         "--case-id-suffix",
         default="__dagger",
         help="Suffix appended to case_id so multiple trajectories don't collide in listwise grouping (default: '__dagger').",
@@ -466,6 +565,7 @@ def main() -> None:
         seed=int(args.seed),
         policy_ckpt=str(args.policy_ckpt),
         case_id_suffix=str(args.case_id_suffix),
+        include_stop=bool(args.include_stop),
     )
     print(json.dumps(summary, ensure_ascii=False))
 

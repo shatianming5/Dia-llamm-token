@@ -1,0 +1,29 @@
+# Train policy config (torch/DDP) (DAgger+oracle, listwise CE + zscore; Adam weight_decay=1e-4; hi32 seq3) (E1036 smoke seed0)
+
+run_id: E1036_smoke_seed0
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/radgenome_policy_dataset_oracle+dagger_lung_nodule_full_eligible_hi32_seq3_e1011_smoke/dataset.jsonl
+
+seed: 0
+
+ddp:
+  backend: nccl
+  fp16: false
+
+train:
+  epochs: 200
+  batch_size: 256
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  ridge: 1.0e-6
+  loss: list_ce
+  label_key: label
+  feature_norm: zscore
+  feature_norm_eps: 1.0e-6
+
+model:
+  input_dim: 16
+  hidden_dims: [256, 256]
+  activation: relu
+

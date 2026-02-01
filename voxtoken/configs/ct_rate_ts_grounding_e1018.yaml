@@ -1,0 +1,31 @@
+# CT-RATE TS grounding benchmark config (hi32 token space; deeper pyramid; sequential multi-step refinement) (E1018+)
+#
+# Goal:
+# - Increase headroom between learned vs random by enabling depth-3 refinement chains at B=32:
+#   L0 (patch=16) -> L1 (8) -> L2 (4) -> L3 (2)
+# - This makes the oracle ceiling higher for small targets (e.g., nodules), and gives the learned
+#   policy more opportunity to focus budget on the right region.
+
+volume:
+  target_shape_cdhw: [1, 32, 32, 32]
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 16
+    # max_levels=4 => patches: 16, 8, 4, 2
+    max_levels: 4
+
+refine:
+  # Sequential refinement: one split per round, multiple rounds.
+  max_rounds: 4
+  max_splits_per_round: 1
+
+policy:
+  mode: heuristic
+  weights:
+    recon_error: 1.0
+    evidence_entropy: 1.0
+    citation_pressure: 0.0
+    history_splits: -1.0
+

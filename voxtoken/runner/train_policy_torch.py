@@ -131,6 +131,10 @@ def _extract_feature_vector(obj: Dict[str, Any], *, input_dim: int) -> List[floa
         x.append(float(obj.get("step_idx", 0.0)))
     if int(input_dim) >= 16:
         x.append(float(obj.get("budget_B", 0.0)))
+    if int(input_dim) >= 17:
+        x.append(float(obj.get("mean_intensity_z", 0.0)))
+    if int(input_dim) >= 18:
+        x.append(float(obj.get("max_intensity_z", 0.0)))
     if len(x) < int(input_dim):
         x = x + [0.0 for _ in range(int(input_dim) - len(x))]
     x = x[: int(input_dim)]

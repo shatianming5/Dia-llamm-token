@@ -19,6 +19,8 @@ from .infer_refine import _load_volume_for_manifest_row
 
 Box = Tuple[float, float, float, float, float, float]  # x0,x1,y0,y1,z0,z1 (mm)
 
+STOP_TOKEN_ID = -1
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -184,14 +186,142 @@ def _token_feature_vector(
     )
 
 
-def _select_splits(policy: SplitPolicy, feats: List[TokenFeatures], *, budget_left: int, max_splits_per_round: int) -> List[int]:
+def _assign_intensity_z(feats: List[TokenFeatures], *, eps: float = 1.0e-6) -> None:
+    """
+    Compute per-group (case,budget,step) intensity normalization using the current token partition.
+
+    Uses law of total variance from per-token mean/variance:
+      E[X]  = Σ w_i * μ_i / Σ w_i
+      E[X²] = Σ w_i * (σ_i² + μ_i²) / Σ w_i
+      Var   = E[X²] - E[X]²
+
+    `recon_error` is the per-token variance proxy.
+    """
+    if not feats:
+        return
+
+    w_sum = 0.0
+    w_mean = 0.0
+    w_e2 = 0.0
+    for f in feats:
+        w = float(getattr(f, "box_volume_mm3", 0.0) or 0.0)
+        if not (w > 0.0):
+            w = 1.0
+        mu_i = float(getattr(f, "mean_intensity", 0.0) or 0.0)
+        var_i = float(getattr(f, "recon_error", 0.0) or 0.0)
+        w_sum += float(w)
+        w_mean += float(w) * float(mu_i)
+        w_e2 += float(w) * (float(var_i) + float(mu_i) * float(mu_i))
+    if not (w_sum > 0.0):
+        return
+
+    mu = float(w_mean) / float(w_sum)
+    e2 = float(w_e2) / float(w_sum)
+    var = max(0.0, float(e2) - float(mu) * float(mu))
+    std = float((float(var) + float(eps)) ** 0.5)
+
+    for f in feats:
+        m = float(getattr(f, "mean_intensity", 0.0) or 0.0)
+        mx = float(getattr(f, "max_intensity", 0.0) or 0.0)
+        f.mean_intensity_z = float(m - mu) / float(std)
+        f.max_intensity_z = float(mx - mu) / float(std)
+
+
+def _make_stop_candidate_feature(feats: List[TokenFeatures]) -> TokenFeatures | None:
+    if not feats:
+        return None
+    n = float(max(1, len(feats)))
+
+    def mean_attr(name: str) -> float:
+        return float(sum(float(getattr(f, name, 0.0) or 0.0) for f in feats)) / float(n)
+
+    f0 = feats[0]
+    return TokenFeatures(
+        token_id=int(STOP_TOKEN_ID),
+        level=int(round(mean_attr("level"))),
+        recon_error=float(mean_attr("recon_error")),
+        evidence_entropy=float(mean_attr("evidence_entropy")),
+        citation_pressure=float(mean_attr("citation_pressure")),
+        history_splits=int(round(mean_attr("history_splits"))),
+        center_x_mm=float(mean_attr("center_x_mm")),
+        center_y_mm=float(mean_attr("center_y_mm")),
+        center_z_mm=float(mean_attr("center_z_mm")),
+        mean_intensity=float(mean_attr("mean_intensity")),
+        max_intensity=float(mean_attr("max_intensity")),
+        box_dx_mm=float(mean_attr("box_dx_mm")),
+        box_dy_mm=float(mean_attr("box_dy_mm")),
+        box_dz_mm=float(mean_attr("box_dz_mm")),
+        box_volume_mm3=float(mean_attr("box_volume_mm3")),
+        step_idx=int(getattr(f0, "step_idx", 0) or 0),
+        budget_B=int(getattr(f0, "budget_B", 0) or 0),
+        mean_intensity_z=float(mean_attr("mean_intensity_z")),
+        max_intensity_z=float(mean_attr("max_intensity_z")),
+    )
+
+
+def _select_splits(
+    policy: SplitPolicy,
+    feats: List[TokenFeatures],
+    *,
+    budget_left: int,
+    max_splits_per_round: int,
+    stop_score_threshold: float | None = None,
+    enable_stop_action: bool = False,
+    filter_invalid_splits: bool = False,
+    pyramid: TokenPyramid | None = None,
+    tokens: List[Token] | None = None,
+    budget_B: int | None = None,
+) -> List[int]:
     if budget_left <= 0:
         return []
     max_splits = max(0, min(int(budget_left), int(max_splits_per_round)))
     if max_splits <= 0:
         return []
-    scored = policy.score(feats)
-    return [int(tid) for tid, _ in scored[:max_splits]]
+    scored_feats = list(feats)
+    if enable_stop_action:
+        stop = _make_stop_candidate_feature(feats)
+        if stop is not None:
+            scored_feats = scored_feats + [stop]
+
+    scored = policy.score(scored_feats)
+    if enable_stop_action and scored and int(scored[0][0]) == int(STOP_TOKEN_ID):
+        return []
+
+    active_ids = {int(t.token_id) for t in (tokens or [])}
+    out: List[int] = []
+    for tid, _s in scored:
+        tid = int(tid)
+        if tid == int(STOP_TOKEN_ID):
+            continue
+        if filter_invalid_splits:
+            if tid not in active_ids:
+                continue
+            if pyramid is None or tokens is None or budget_B is None:
+                continue
+            child_ids = list(pyramid.children_map.get(int(tid), []))
+            if not child_ids:
+                continue
+            new_count = int(len(tokens) - 1 + len(child_ids))
+            if int(new_count) > int(budget_B):
+                continue
+        # Optional stop-on-score threshold: if the best *valid* candidate has a score
+        # <= threshold, return no splits (stop early). This is intended for policies
+        # trained to regress marginal reward (e.g., IoU improvement), where 0 is the
+        # natural "no gain" decision boundary.
+        if stop_score_threshold is not None:
+            try:
+                thr = float(stop_score_threshold)
+            except Exception:
+                thr = None
+            if thr is not None and float(_s) <= float(thr):
+                # If even the best valid option is below threshold, stop early.
+                if not out:
+                    return []
+                break
+        out.append(int(tid))
+        if len(out) >= int(max_splits):
+            break
+    return out
 
 
 def _select_splits_random(
@@ -340,6 +470,9 @@ def ct_rate_grounding_benchmark(
         refine_cfg = {}
     max_rounds = int(refine_cfg.get("max_rounds", 0))
     max_splits_per_round = int(refine_cfg.get("max_splits_per_round", 0)) or 0
+    enable_stop_action = bool(refine_cfg.get("enable_stop_action", False))
+    filter_invalid_splits = bool(refine_cfg.get("filter_invalid_splits", False))
+    stop_score_threshold = refine_cfg.get("stop_score_threshold", None)
 
     policy_cfg = cfg.get("policy", {})
     if not isinstance(policy_cfg, dict):
@@ -410,11 +543,18 @@ def ct_rate_grounding_benchmark(
                                 )
                                 for t in tk
                             ]
+                            _assign_intensity_z(feats)
                             split_ids = _select_splits(
                                 pol,
                                 feats,
                                 budget_left=int(budget_left),
                                 max_splits_per_round=int(max_splits),
+                                stop_score_threshold=(stop_score_threshold if method == "learned" else None),
+                                enable_stop_action=bool(enable_stop_action and method == "learned"),
+                                filter_invalid_splits=bool(filter_invalid_splits),
+                                pyramid=pyramid,
+                                tokens=tk,
+                                budget_B=int(budget_B),
                             )
                             tk2, executed = _refine_select(pyramid, tk, split_ids, int(budget_B))
                         elif method == "random":

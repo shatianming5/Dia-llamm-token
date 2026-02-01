@@ -94,6 +94,9 @@ class TokenFeatures:
     box_volume_mm3: float = 0.0
     step_idx: int = 0
     budget_B: int = 0
+    # Per-step/group normalized intensity features (computed from token-set partition statistics).
+    mean_intensity_z: float = 0.0
+    max_intensity_z: float = 0.0
 
 
 __all__ = [
