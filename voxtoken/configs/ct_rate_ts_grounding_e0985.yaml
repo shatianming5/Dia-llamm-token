@@ -1,0 +1,28 @@
+# CT-RATE TS grounding benchmark config (higher-res token space) (E0985+)
+#
+# Rationale: keep Level-0 coarse tokens at 8 (2x2x2), but increase the underlying
+# token-space resolution from 16^3 -> 32^3 so token patch statistics carry more signal.
+
+volume:
+  target_shape_cdhw: [1, 32, 32, 32]
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    # 32 / 16 = 2 per axis => 8 Level-0 coarse tokens (same as E0907 config), but each token
+    # sees more voxels.
+    patch: 16
+    max_levels: 3
+
+refine:
+  max_rounds: 2
+  max_splits_per_round: 4
+
+policy:
+  mode: heuristic
+  weights:
+    recon_error: 1.0
+    evidence_entropy: 1.0
+    citation_pressure: 0.0
+    history_splits: -1.0
+

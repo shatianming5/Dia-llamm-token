@@ -120,6 +120,18 @@ class SplitPolicy(Module):
                     base.append(float(getattr(f, "max_intensity", 0.0)))
                 if dim >= 10:
                     base.append(float(getattr(f, "level", 0.0)))
+                if dim >= 11:
+                    base.append(float(getattr(f, "box_dx_mm", 0.0)))
+                if dim >= 12:
+                    base.append(float(getattr(f, "box_dy_mm", 0.0)))
+                if dim >= 13:
+                    base.append(float(getattr(f, "box_dz_mm", 0.0)))
+                if dim >= 14:
+                    base.append(float(getattr(f, "box_volume_mm3", 0.0)))
+                if dim >= 15:
+                    base.append(float(getattr(f, "step_idx", 0.0)))
+                if dim >= 16:
+                    base.append(float(getattr(f, "budget_B", 0.0)))
                 v = base[:dim] + [0.0 for _ in range(max(0, dim - len(base)))]
                 if mean is not None and std is not None:
                     v = [(float(v[i]) - float(mean[i])) / float(std[i]) for i in range(int(dim))]

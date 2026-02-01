@@ -35,6 +35,26 @@ def _parse_require_budgets(s: str) -> List[int]:
     return out
 
 
+def _parse_require_keys(s: str) -> List[str]:
+    raw = str(s or "").strip()
+    if not raw:
+        return []
+    out: List[str] = []
+    for part in raw.split(","):
+        k = str(part).strip()
+        if k:
+            out.append(k)
+    # Preserve order while de-duping.
+    seen: set[str] = set()
+    uniq: List[str] = []
+    for k in out:
+        if k in seen:
+            continue
+        seen.add(k)
+        uniq.append(k)
+    return uniq
+
+
 def validate_policy_dataset(
     rows: List[Dict[str, Any]],
     *,
@@ -42,6 +62,7 @@ def validate_policy_dataset(
     require_cases_ge: int | None,
     require_label: bool,
     require_budgets: List[int],
+    require_keys: List[str],
     require_step_idx: bool,
     require_exactly_one_positive_per_step: bool,
 ) -> List[str]:
@@ -56,6 +77,9 @@ def validate_policy_dataset(
     required_keys = ["case_id", "token_id", "recon_error", "evidence_entropy", "citation_pressure", "history_splits", "reward"]
     for i, r in enumerate(rows[: min(50, len(rows))]):
         for k in required_keys:
+            if k not in r:
+                errors.append(f"row[{i}] missing key: {k}")
+        for k in require_keys or []:
             if k not in r:
                 errors.append(f"row[{i}] missing key: {k}")
         if require_label:
@@ -150,6 +174,7 @@ def main() -> None:
     parser.add_argument("--require-cases-ge", type=int, default=None)
     parser.add_argument("--require-label", action="store_true", help="Require oracle-imitation label field (0/1)")
     parser.add_argument("--require-budgets", default="", help="Comma-separated list of required budget_B values (e.g., '16,32')")
+    parser.add_argument("--require-keys", default="", help="Comma-separated list of extra keys required to exist in rows")
     parser.add_argument("--require-step-idx", action="store_true", help="Require step_idx field (for listwise training)")
     parser.add_argument(
         "--require-exactly-one-positive-per-step",
@@ -165,12 +190,14 @@ def main() -> None:
 
     rows = _load_jsonl(p)
     req_budgets = _parse_require_budgets(str(args.require_budgets))
+    req_keys = _parse_require_keys(str(args.require_keys))
     errors = validate_policy_dataset(
         rows,
         require_rows_ge=args.require_rows_ge,
         require_cases_ge=args.require_cases_ge,
         require_label=bool(args.require_label),
         require_budgets=list(req_budgets),
+        require_keys=list(req_keys),
         require_step_idx=bool(args.require_step_idx),
         require_exactly_one_positive_per_step=bool(args.require_exactly_one_positive_per_step),
     )

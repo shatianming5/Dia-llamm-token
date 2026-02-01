@@ -1,0 +1,30 @@
+# Train policy config (torch/DDP) (oracle imitation, listwise soft-CE + zscore + box geom + context features) (RadGenome-ChestCT: lung nodule, full-eligible) (E0975 seed1)
+
+run_id: E0975_seed1
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/radgenome_policy_dataset_oracle_lung_nodule_full_eligible_e0964/dataset.jsonl
+
+seed: 1
+
+ddp:
+  backend: nccl
+  fp16: false
+
+train:
+  epochs: 200
+  batch_size: 256
+  lr: 1.0e-3
+  weight_decay: 0.0
+  ridge: 1.0e-6
+  loss: list_soft_ce
+  label_key: label
+  feature_norm: zscore
+  feature_norm_eps: 1.0e-6
+
+model:
+  # 4 base + xyz centers + mean/max intensity + level + box dx/dy/dz/volume + step_idx + budget_B
+  input_dim: 16
+  hidden_dims: [128, 128]
+  activation: relu
+

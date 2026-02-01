@@ -96,6 +96,8 @@ def _token_feature_vector(
     *,
     volume: Any,
     voxel_spacing_mm: List[float],
+    budget_B: int,
+    step_idx: int,
 ) -> TokenFeatures:
     sx, sy, sz = [float(x) for x in (voxel_spacing_mm or [1.0, 1.0, 1.0])]
 
@@ -158,6 +160,9 @@ def _token_feature_vector(
 
     mean_int, var, vmax = _patch_variance()
     x0, x1, y0, y1, z0, z1 = [float(x) for x in token.omega_box_mm]
+    dx = max(0.0, float(x1) - float(x0))
+    dy = max(0.0, float(y1) - float(y0))
+    dz = max(0.0, float(z1) - float(z0))
     return TokenFeatures(
         token_id=int(token.token_id),
         level=int(token.level),
@@ -170,6 +175,12 @@ def _token_feature_vector(
         center_z_mm=float((z0 + z1) / 2.0),
         mean_intensity=float(mean_int),
         max_intensity=float(vmax),
+        box_dx_mm=float(dx),
+        box_dy_mm=float(dy),
+        box_dz_mm=float(dz),
+        box_volume_mm3=float(dx * dy * dz),
+        step_idx=int(step_idx),
+        budget_B=int(budget_B),
     )
 
 
@@ -389,7 +400,16 @@ def ct_rate_grounding_benchmark(
                         executed: List[int]
                         if method in {"heuristic", "learned"}:
                             pol = pol_learned if method == "learned" else pol_heuristic
-                            feats = [_token_feature_vector(t, volume=volume, voxel_spacing_mm=spacing) for t in tk]
+                            feats = [
+                                _token_feature_vector(
+                                    t,
+                                    volume=volume,
+                                    voxel_spacing_mm=spacing,
+                                    budget_B=int(budget_B),
+                                    step_idx=int(_k),
+                                )
+                                for t in tk
+                            ]
                             split_ids = _select_splits(
                                 pol,
                                 feats,

@@ -119,6 +119,18 @@ def _extract_feature_vector(obj: Dict[str, Any], *, input_dim: int) -> List[floa
         x.append(float(obj.get("max_intensity", 0.0)))
     if int(input_dim) >= 10:
         x.append(float(obj.get("level", 0.0)))
+    if int(input_dim) >= 11:
+        x.append(float(obj.get("box_dx_mm", 0.0)))
+    if int(input_dim) >= 12:
+        x.append(float(obj.get("box_dy_mm", 0.0)))
+    if int(input_dim) >= 13:
+        x.append(float(obj.get("box_dz_mm", 0.0)))
+    if int(input_dim) >= 14:
+        x.append(float(obj.get("box_volume_mm3", 0.0)))
+    if int(input_dim) >= 15:
+        x.append(float(obj.get("step_idx", 0.0)))
+    if int(input_dim) >= 16:
+        x.append(float(obj.get("budget_B", 0.0)))
     if len(x) < int(input_dim):
         x = x + [0.0 for _ in range(int(input_dim) - len(x))]
     x = x[: int(input_dim)]
@@ -169,8 +181,8 @@ def _load_dataset_jsonl(
     if int(input_dim) < 4:
         raise ValueError(f"model.input_dim must be >=4 (got {input_dim})")
     loss_norm = str(loss or "mse").strip().lower() or "mse"
-    if loss_norm not in {"mse", "bce", "list_ce"}:
-        raise ValueError(f"train.loss must be one of: mse|bce|list_ce (got {loss!r})")
+    if loss_norm not in {"mse", "bce", "list_ce", "list_soft_ce"}:
+        raise ValueError(f"train.loss must be one of: mse|bce|list_ce|list_soft_ce (got {loss!r})")
     label_key = str(label_key or "label").strip() or "label"
     n = 0
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -182,7 +194,7 @@ def _load_dataset_jsonl(
         try:
             x = _extract_feature_vector(obj, input_dim=int(input_dim))
             reward = float(obj.get("reward", 0.0))
-            if loss_norm in {"bce", "list_ce"}:
+            if loss_norm in {"bce", "list_ce", "list_soft_ce"}:
                 y = float(obj.get(label_key, 0.0))
             else:
                 y = float(reward)
@@ -208,8 +220,9 @@ def _load_dataset_groups_jsonl(
     Build listwise groups keyed by (case_id, budget_B, step_idx).
 
     Each group is a dict:
-      - x: List[List[float]]  (n_candidates, input_dim)
-      - target: int           (index of the single label==1 candidate)
+      - x: List[List[float]]      (n_candidates, input_dim)
+      - target: int               (index of the single label==1 candidate)
+      - rewards: List[float]      (n_candidates)
       - case_id/budget_B/step_idx (for audit)
     """
     label_key = str(label_key or "label").strip() or "label"
@@ -244,6 +257,10 @@ def _load_dataset_groups_jsonl(
         except Exception:
             continue
         try:
+            reward = float(obj.get("reward", 0.0))
+        except Exception:
+            reward = 0.0
+        try:
             label = int(obj.get(label_key, 0) or 0)
         except Exception:
             label = 0
@@ -254,11 +271,12 @@ def _load_dataset_groups_jsonl(
         if g is None:
             if int(max_groups) > 0 and len(order) >= int(max_groups):
                 continue
-            g = {"x": [], "labels": [], "case_id": case_id, "budget_B": int(budget_B), "step_idx": int(step_idx)}
+            g = {"x": [], "labels": [], "rewards": [], "case_id": case_id, "budget_B": int(budget_B), "step_idx": int(step_idx)}
             by_key[key] = g
             order.append(key)
         g["x"].append(x)
         g["labels"].append(int(label))
+        g["rewards"].append(float(reward))
 
     groups: List[Dict[str, Any]] = []
     for key in order:
@@ -267,15 +285,19 @@ def _load_dataset_groups_jsonl(
             continue
         xs = list(g.get("x") or [])
         labels = list(g.get("labels") or [])
+        rewards = list(g.get("rewards") or [])
         if len(xs) < 2:
             continue
         pos = [i for i, v in enumerate(labels) if int(v) == 1]
         if len(pos) != 1:
             continue
+        if len(rewards) != len(xs):
+            continue
         groups.append(
             {
                 "x": xs,
                 "target": int(pos[0]),
+                "rewards": [float(v) for v in rewards],
                 "case_id": str(g.get("case_id", "")),
                 "budget_B": int(g.get("budget_B", 0) or 0),
                 "step_idx": int(g.get("step_idx", 0) or 0),
@@ -399,10 +421,10 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
 
     opt = torch.optim.Adam(model.parameters(), lr=float(lr), weight_decay=float(weight_decay))
     loss_norm = str(loss_name).strip().lower() or "mse"
-    if loss_norm not in {"mse", "bce", "list_ce"}:
-        raise ValueError(f"train.loss must be one of: mse|bce|list_ce (got {loss_name!r})")
+    if loss_norm not in {"mse", "bce", "list_ce", "list_soft_ce"}:
+        raise ValueError(f"train.loss must be one of: mse|bce|list_ce|list_soft_ce (got {loss_name!r})")
 
-    if loss_norm == "list_ce":
+    if loss_norm in {"list_ce", "list_soft_ce"}:
         # Listwise CE over candidate tokens per (case_id, budget_B, step_idx).
         groups = _load_dataset_groups_jsonl(
             dataset_jsonl,
@@ -420,11 +442,12 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
             def __len__(self) -> int:
                 return int(len(self._gs))
 
-            def __getitem__(self, idx: int) -> Tuple[List[List[float]], int]:
+            def __getitem__(self, idx: int) -> Tuple[List[List[float]], int, List[float]]:
                 g = self._gs[int(idx)]
                 xs_g = g.get("x") or []
                 tgt = int(g.get("target", 0))
-                return list(xs_g), int(tgt)
+                rewards_g = g.get("rewards") or []
+                return list(xs_g), int(tgt), [float(v) for v in rewards_g]
 
         ds = _GroupDataset(groups)
         if distributed:
@@ -432,24 +455,29 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
         else:
             sampler = None
 
-        def _collate(batch: List[Tuple[List[List[float]], int]]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        def _collate(
+            batch: List[Tuple[List[List[float]], int, List[float]]],
+        ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
             bsz = int(len(batch))
             max_len = 1
-            for xs_g, _t in batch:
+            for xs_g, _t, _r in batch:
                 max_len = max(int(max_len), int(len(xs_g)))
             dim = int(input_dim)
 
             x_pad = torch.zeros((bsz, int(max_len), int(dim)), dtype=torch.float32)
             mask = torch.zeros((bsz, int(max_len)), dtype=torch.bool)
             target = torch.zeros((bsz,), dtype=torch.long)
-            for i, (xs_g, t) in enumerate(batch):
+            rewards_pad = torch.zeros((bsz, int(max_len)), dtype=torch.float32)
+            for i, (xs_g, t, rewards_g) in enumerate(batch):
                 n = int(len(xs_g))
                 if n <= 0:
                     continue
                 x_pad[i, :n, :] = torch.tensor([_norm_vec(list(v)) for v in xs_g], dtype=torch.float32)
                 mask[i, :n] = True
                 target[i] = int(t)
-            return x_pad, mask, target
+                if rewards_g:
+                    rewards_pad[i, :n] = torch.tensor([float(v) for v in rewards_g[:n]], dtype=torch.float32)
+            return x_pad, mask, target, rewards_pad
 
         loader = torch.utils.data.DataLoader(  # type: ignore[attr-defined]
             ds,
@@ -491,20 +519,37 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
         total_loss = 0.0
         total_n = 0
         total_acc = 0.0
-        if loss_norm == "list_ce":
+        if loss_norm in {"list_ce", "list_soft_ce"}:
             import torch.nn.functional as F  # type: ignore
 
-            for xb, mask, target in loader:
+            for xb, mask, target, rewards in loader:
                 xb = xb.to(device)
                 mask = mask.to(device)
                 target = target.to(device)
+                rewards = rewards.to(device)
 
                 bsz, seq_len, dim = xb.shape
                 opt.zero_grad(set_to_none=True)
                 with autocast(enabled=bool(scaler.is_enabled())):
                     logits = model(xb.view(int(bsz) * int(seq_len), int(dim))).view(int(bsz), int(seq_len))
                     logits = logits.masked_fill(~mask, -1.0e9)
-                    loss = F.cross_entropy(logits, target)
+                    if loss_norm == "list_ce":
+                        loss = F.cross_entropy(logits, target)
+                    else:
+                        # Soft targets derived from per-candidate rewards. This keeps the hard argmax signal,
+                        # but also provides gradient on near-optimal alternatives.
+                        rp = torch.relu(rewards).to(torch.float32) * mask.to(torch.float32)
+                        denom = rp.sum(dim=1, keepdim=True)
+
+                        p = torch.zeros_like(rp)
+                        nonzero = denom.view(-1) > 0.0
+                        if bool(nonzero.any()):
+                            p[nonzero] = rp[nonzero] / denom[nonzero]
+                        if bool((~nonzero).any()):
+                            p[~nonzero].scatter_(1, target[~nonzero].view(-1, 1), 1.0)
+
+                        log_probs = F.log_softmax(logits, dim=1)
+                        loss = -(p * log_probs).sum(dim=1).mean()
                 if scaler.is_enabled():
                     scaler.scale(loss).backward()
                     scaler.step(opt)
@@ -562,6 +607,9 @@ def train_policy_torch(cfg: Dict[str, Any]) -> Dict[str, Any]:
             }
             if loss_norm == "list_ce":
                 row["loss_list_ce"] = float(mean_loss)
+                row["top1_acc"] = float(mean_acc)
+            elif loss_norm == "list_soft_ce":
+                row["loss_list_soft_ce"] = float(mean_loss)
                 row["top1_acc"] = float(mean_acc)
             else:
                 row["loss_mse"] = float(mean_loss)

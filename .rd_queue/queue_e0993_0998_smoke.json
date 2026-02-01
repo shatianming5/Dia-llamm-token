@@ -1,0 +1,44 @@
+[
+  {
+    "id": "E0993",
+    "stage": "smoke",
+    "name": "policy-data: build oracle split-trajectory dataset (hi32 token-space) (RadGenome lung nodule; full-eligible; budgets 8/16/32) (smoke)",
+    "command": "python -m voxtoken.runner.build_policy_dataset_oracle --manifest artifacts/radgenome_gt_lung_nodule_full_eligible_hi32_e0986_smoke/manifest.jsonl --out artifacts/radgenome_policy_dataset_oracle_lung_nodule_full_eligible_hi32_b162432_e0993_smoke/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e0985.yaml --split train --budgets 16 24 32 --max-cases 50 --seed 0 && python -m voxtoken.runner.validate_policy_dataset_jsonl --in artifacts/radgenome_policy_dataset_oracle_lung_nodule_full_eligible_hi32_b162432_e0993_smoke/dataset.jsonl --require-rows-ge 500 --require-cases-ge 20 --require-label --require-budgets 16,24,32 --require-step-idx --require-exactly-one-positive-per-step --require-keys center_x_mm,center_y_mm,center_z_mm,mean_intensity,max_intensity,level,box_dx_mm,box_dy_mm,box_dz_mm,box_volume_mm3,step_idx,budget_B",
+    "workdir": "."
+  },
+  {
+    "id": "E0994",
+    "stage": "smoke",
+    "name": "policy: train torch split policy (oracle imitation; listwise+zscore + box geom + context; hi32 token-space; budgets 8/16/32; multi-seed) (smoke)",
+    "command": "python -m voxtoken.runner.validate_policy_dataset_jsonl --in artifacts/radgenome_policy_dataset_oracle_lung_nodule_full_eligible_hi32_b162432_e0993_smoke/dataset.jsonl --require-rows-ge 500 --require-cases-ge 20 --require-label --require-budgets 16,24,32 --require-step-idx --require-exactly-one-positive-per-step --require-keys center_x_mm,center_y_mm,center_z_mm,mean_intensity,max_intensity,level,box_dx_mm,box_dy_mm,box_dz_mm,box_volume_mm3,step_idx,budget_B && torchrun --standalone --nproc_per_node 1 -m voxtoken.runner.train_policy_torch --config voxtoken/configs/train_policy_radgenome_lung_nodule_oracle_torch_hi32_e0994_smoke_seed0.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0994_smoke_seed0/checkpoint.json --require-nondefault-weights",
+    "workdir": "."
+  },
+  {
+    "id": "E0995",
+    "stage": "smoke",
+    "name": "eval: RadGenome lung nodule grounding benchmark (hi32 budgets 8/16/32-trained policy; val=100; multi-seed) (smoke)",
+    "command": "python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_hi32_e0985_smoke/manifest.jsonl --out artifacts/e0995_benchmark_radgenome_lung_nodule_hi32_b162432_val100_smoke_seed0 --config voxtoken/configs/ct_rate_ts_grounding_e0985.yaml --budgets 8 16 32 --max-cases 0 --split val --seed 0 --policy-ckpt outputs/train_policy/E0994_smoke_seed0/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0995_benchmark_radgenome_lung_nodule_hi32_b162432_val100_smoke_seed0/summary.json --require-methods fixed heuristic learned random oracle",
+    "workdir": "."
+  },
+  {
+    "id": "E0996",
+    "stage": "smoke",
+    "name": "paper: export CI tables/plots + improvement gate (hi32 budgets 8/16/32-trained policy; val=100; multi-seed) (smoke)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0995_benchmark_radgenome_lung_nodule_hi32_b162432_val100_smoke_seed0/metrics.jsonl --out artifacts/paper_e0996_radgenome_lung_nodule_hi32_b162432_listwise_zscore_boxgeom_ctx_policy_val100_smoke && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0996_radgenome_lung_nodule_hi32_b162432_listwise_zscore_boxgeom_ctx_policy_val100_smoke",
+    "workdir": "."
+  },
+  {
+    "id": "E0997",
+    "stage": "smoke",
+    "name": "eval: RadGenome lung nodule grounding benchmark (hi32 budgets 8/16/32-trained policy; full-eligible val=126; multi-seed) (smoke)",
+    "command": "python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_full_eligible_hi32_e0986_smoke/manifest.jsonl --out artifacts/e0997_benchmark_radgenome_lung_nodule_hi32_b162432_full_eligible_smoke_seed0 --config voxtoken/configs/ct_rate_ts_grounding_e0985.yaml --budgets 8 16 32 --max-cases 0 --split val --seed 0 --policy-ckpt outputs/train_policy/E0994_smoke_seed0/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0997_benchmark_radgenome_lung_nodule_hi32_b162432_full_eligible_smoke_seed0/summary.json --require-methods fixed heuristic learned random oracle",
+    "workdir": "."
+  },
+  {
+    "id": "E0998",
+    "stage": "smoke",
+    "name": "paper: export CI tables/plots + improvement gate (hi32 budgets 8/16/32-trained policy; full-eligible val=126; multi-seed) (smoke)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0997_benchmark_radgenome_lung_nodule_hi32_b162432_full_eligible_smoke_seed0/metrics.jsonl --out artifacts/paper_e0998_radgenome_lung_nodule_hi32_b162432_listwise_zscore_boxgeom_ctx_policy_full_eligible_smoke && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0998_radgenome_lung_nodule_hi32_b162432_listwise_zscore_boxgeom_ctx_policy_full_eligible_smoke",
+    "workdir": "."
+  }
+]

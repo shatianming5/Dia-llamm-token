@@ -62,7 +62,7 @@ class RefineRunner:
         max_rounds = int(self.cfg.get("refine", {}).get("max_rounds", 0))
         for k in range(max_rounds):
             tk0 = time.perf_counter()
-            feats = self._featurize_tokens(tk, pyramid, volume, cites, issues)
+            feats = self._featurize_tokens(tk, pyramid, volume, cites, issues, budget_B=int(budget_B), step_idx=int(k))
             split_ids = self._select_splits(feats, budget_left=budget_B - len(tk))
             tk2, executed_split_ids = self._refine_select(pyramid, tk, split_ids, budget_B)
             tk1 = time.perf_counter()
@@ -155,7 +155,15 @@ class RefineRunner:
         return evidence, plan, fixed_text, citations, float(score), issues, latency
 
     def _featurize_tokens(
-        self, tokens: List[Token], pyramid: TokenPyramid, volume: Tensor, citations: List[Citation], issues: List[Issue]
+        self,
+        tokens: List[Token],
+        pyramid: TokenPyramid,
+        volume: Tensor,
+        citations: List[Citation],
+        issues: List[Issue],
+        *,
+        budget_B: int,
+        step_idx: int,
     ) -> List[TokenFeatures]:
         # Feature proxies (stdlib-only): use per-token patch statistics as recon/entropy signals.
         sx, sy, sz = self.tokenizer.cfg.get("voxel_spacing_mm", [1.0, 1.0, 1.0])  # type: ignore[assignment]
@@ -225,6 +233,9 @@ class RefineRunner:
         feats: List[TokenFeatures] = []
         for t in tokens:
             x0, x1, y0, y1, z0, z1 = [float(x) for x in t.omega_box_mm]
+            dx = max(0.0, float(x1) - float(x0))
+            dy = max(0.0, float(y1) - float(y0))
+            dz = max(0.0, float(z1) - float(z0))
             mean_int, var, vmax = _patch_variance(t)
             feats.append(
                 TokenFeatures(
@@ -239,6 +250,12 @@ class RefineRunner:
                     center_z_mm=float((z0 + z1) / 2.0),
                     mean_intensity=float(mean_int),
                     max_intensity=float(vmax),
+                    box_dx_mm=float(dx),
+                    box_dy_mm=float(dy),
+                    box_dz_mm=float(dz),
+                    box_volume_mm3=float(dx * dy * dz),
+                    step_idx=int(step_idx),
+                    budget_B=int(budget_B),
                 )
             )
         return feats

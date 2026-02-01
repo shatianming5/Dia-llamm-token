@@ -3,12 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from ..models.policy import SplitPolicy
 from ..models.tokenizer import TokenPyramid, Tokenizer3D
 from ..schemas import Token
 from .infer_refine import _load_volume_for_manifest_row  # repo-skeleton reuse
@@ -191,16 +191,18 @@ def _refine_select(pyramid: TokenPyramid, tokens: List[Token], split_ids: List[i
         child_ids = list(pyramid.children_map.get(pid, []))
         if not child_ids:
             continue
-        new_count = int(len(out) - 1 + len(child_ids))
-        if new_count > int(budget_B):
+
+        child_tokens = [pyramid.token_by_id[cid] for cid in child_ids if cid in pyramid.token_by_id]
+        if not child_tokens:
+            continue
+
+        new_count = len(out) - 1 + len(child_tokens)
+        if int(new_count) > int(budget_B):
             continue
 
         out = [t for t in out if int(t.token_id) != pid]
         active_ids.remove(pid)
-        for cid in child_ids:
-            if cid not in pyramid.token_by_id:
-                continue
-            ct = pyramid.token_by_id[cid]
+        for ct in child_tokens:
             if int(ct.token_id) in active_ids:
                 continue
             out.append(ct)
@@ -211,7 +213,34 @@ def _refine_select(pyramid: TokenPyramid, tokens: List[Token], split_ids: List[i
     return out, executed
 
 
-def build_policy_dataset_oracle(
+def _policy_choose_split_id(policy: SplitPolicy, pyramid: TokenPyramid, tokens: List[Token], *, budget_B: int) -> int | None:
+    raise RuntimeError("_policy_choose_split_id should not be called; use policy.score(feats) with full TokenFeatures.")
+
+
+def _choose_split_id_from_scores(
+    scored: List[Tuple[int, float]],
+    pyramid: TokenPyramid,
+    tokens: List[Token],
+    *,
+    budget_B: int,
+) -> int | None:
+    active_ids = {int(t.token_id) for t in tokens}
+    n_tokens = int(len(tokens))
+    for tid, _s in scored:
+        tid = int(tid)
+        if tid not in active_ids:
+            continue
+        child_ids = list(pyramid.children_map.get(tid, []))
+        if not child_ids:
+            continue
+        new_count = int(n_tokens - 1 + len(child_ids))
+        if int(new_count) > int(budget_B):
+            continue
+        return int(tid)
+    return None
+
+
+def build_policy_dataset_dagger(
     *,
     manifest_jsonl: Path,
     out_jsonl: Path,
@@ -220,6 +249,8 @@ def build_policy_dataset_oracle(
     budgets: List[int],
     max_cases: int,
     seed: int,
+    policy_ckpt: str,
+    case_id_suffix: str,
 ) -> Dict[str, Any]:
     rows = _load_jsonl(manifest_jsonl)
     rows.sort(key=lambda r: str(r.get("case_id", "")).strip())
@@ -245,15 +276,17 @@ def build_policy_dataset_oracle(
         spacing = [1.0, 1.0, 1.0]
     spacing = [float(x) for x in spacing]
 
+    pol = SplitPolicy({"mode": "heuristic", "checkpoint_path": str(policy_ckpt).strip()})
+
     out_lines: List[str] = []
     loader_counts: Counter[str] = Counter()
     counts_by_budget: Counter[str] = Counter()
     n_cases = 0
-    n_skipped_split = 0
-    n_skipped_missing_gt = 0
     n_steps = 0
     n_pos = 0
     n_neg = 0
+    n_skipped_split = 0
+    n_skipped_missing_gt = 0
 
     for row in rows:
         if max_cases > 0 and n_cases >= int(max_cases):
@@ -265,6 +298,7 @@ def build_policy_dataset_oracle(
         case_id = str(row.get("case_id", "")).strip()
         if not case_id:
             continue
+        case_id_out = str(case_id) + str(case_id_suffix or "")
 
         gt_boxes = _parse_gt_boxes_sent0(row)
         if not gt_boxes:
@@ -281,7 +315,7 @@ def build_policy_dataset_oracle(
             tk: List[Token] = list(base_tokens)
             step_idx = 0
 
-            for _ in range(max(0, int(max_splits_total))):
+            for _ in range(max(1, int(max_splits_total or 8))):
                 token_boxes = [t.omega_box_mm for t in tk]
                 base_iou = _best_iou(token_boxes, gt_boxes)
 
@@ -312,7 +346,11 @@ def build_policy_dataset_oracle(
                 if best_pid is None or float(best_impr) <= 0.0:
                     break
 
-                # Emit one-vs-rest labels for this step (single positive best_pid).
+                # Featurize once: used for both dataset emission and policy rollout.
+                feats_by_tid: Dict[int, Dict[str, Any]] = {}
+                policy_feats: List[Any] = []
+                from ..schemas import TokenFeatures
+
                 for t in tk:
                     pid = int(t.token_id)
                     label = int(pid == int(best_pid))
@@ -321,10 +359,33 @@ def build_policy_dataset_oracle(
                     else:
                         n_neg += 1
                     feats = _token_feature_vector(t, volume=volume, voxel_spacing_mm=spacing)
+                    feats_by_tid[int(pid)] = dict(feats)
+                    policy_feats.append(
+                        TokenFeatures(
+                            token_id=int(pid),
+                            level=int(feats.get("level", t.level)),
+                            recon_error=float(feats.get("recon_error", 0.0)),
+                            evidence_entropy=float(feats.get("evidence_entropy", 0.0)),
+                            citation_pressure=float(feats.get("citation_pressure", 0.0)),
+                            history_splits=int(feats.get("history_splits", len(t.children_ids))),
+                            center_x_mm=float(feats.get("center_x_mm", 0.0)),
+                            center_y_mm=float(feats.get("center_y_mm", 0.0)),
+                            center_z_mm=float(feats.get("center_z_mm", 0.0)),
+                            mean_intensity=float(feats.get("mean_intensity", 0.0)),
+                            max_intensity=float(feats.get("max_intensity", 0.0)),
+                            box_dx_mm=float(feats.get("box_dx_mm", 0.0)),
+                            box_dy_mm=float(feats.get("box_dy_mm", 0.0)),
+                            box_dz_mm=float(feats.get("box_dz_mm", 0.0)),
+                            box_volume_mm3=float(feats.get("box_volume_mm3", 0.0)),
+                            step_idx=int(step_idx),
+                            budget_B=int(budget_B),
+                        )
+                    )
                     out_lines.append(
                         json.dumps(
                             {
-                                "case_id": str(case_id),
+                                "case_id": str(case_id_out),
+                                "orig_case_id": str(case_id),
                                 "budget_B": int(budget_B),
                                 "step_idx": int(step_idx),
                                 "token_id": int(pid),
@@ -336,7 +397,12 @@ def build_policy_dataset_oracle(
                         )
                     )
 
-                tk2, executed = _refine_select(pyramid, tk, [int(best_pid)], int(budget_B))
+                # Take the next action from the current policy (DAgger rollout).
+                scored = pol.score(list(policy_feats))
+                chosen_pid = _choose_split_id_from_scores(scored, pyramid, tk, budget_B=int(budget_B))
+                if chosen_pid is None:
+                    break
+                tk2, executed = _refine_select(pyramid, tk, [int(chosen_pid)], int(budget_B))
                 if not executed or len(tk2) == len(tk):
                     break
                 tk = tk2
@@ -357,6 +423,8 @@ def build_policy_dataset_oracle(
         "budgets": [int(b) for b in budgets_sorted],
         "max_cases": int(max_cases),
         "seed": int(seed),
+        "policy_ckpt": str(policy_ckpt),
+        "case_id_suffix": str(case_id_suffix),
         "n_cases": int(n_cases),
         "n_rows": int(len(out_lines)),
         "n_steps": int(n_steps),
@@ -371,42 +439,34 @@ def build_policy_dataset_oracle(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build an oracle-trajectory policy dataset from a GT-box manifest (repo-skeleton).")
+    parser = argparse.ArgumentParser(description="Build a DAgger-style policy dataset from GT boxes by rolling out a learned policy.")
     parser.add_argument("--manifest", required=True, help="Input GT manifest.jsonl (must include volume_path + gt boxes)")
     parser.add_argument("--out", required=True, help="Output dataset.jsonl path")
     parser.add_argument("--config", required=True, help="YAML config (reuses tokenizer/refine settings)")
+    parser.add_argument("--policy-ckpt", required=True, help="Policy checkpoint.json path to roll out (SplitPolicy checkpoint)")
     parser.add_argument("--split", default="train", help="Split to use (train|val|test)")
     parser.add_argument("--budgets", type=int, nargs="+", default=[16, 32], help="Budgets to generate trajectories for")
     parser.add_argument("--max-cases", type=int, default=0, help="Max cases to process (0 = no limit)")
-    parser.add_argument("--seed", type=int, default=0, help="Seed (logged for reproducibility; does not randomize selection)")
+    parser.add_argument("--seed", type=int, default=0, help="Seed for deterministic ordering/selection (future use)")
+    parser.add_argument(
+        "--case-id-suffix",
+        default="__dagger",
+        help="Suffix appended to case_id so multiple trajectories don't collide in listwise grouping (default: '__dagger').",
+    )
     args = parser.parse_args()
 
-    cfg_path = Path(args.config)
-    if not cfg_path.exists():
-        print(f"[ERR] missing config: {cfg_path}", file=sys.stderr)
-        sys.exit(2)
-    cfg = _load_yaml(cfg_path)
-
-    manifest = Path(args.manifest)
-    if not manifest.exists():
-        print(f"[ERR] missing manifest: {manifest}", file=sys.stderr)
-        sys.exit(2)
-
-    out_jsonl = Path(args.out)
-    try:
-        summary = build_policy_dataset_oracle(
-            manifest_jsonl=manifest,
-            out_jsonl=out_jsonl,
-            cfg=cfg,
-            split=str(args.split),
-            budgets=[int(b) for b in list(args.budgets or [])],
-            max_cases=int(args.max_cases),
-            seed=int(args.seed),
-        )
-    except Exception as exc:  # noqa: BLE001
-        print(f"[ERR] {exc}", file=sys.stderr)
-        raise
-
+    cfg = _load_yaml(Path(str(args.config)))
+    summary = build_policy_dataset_dagger(
+        manifest_jsonl=Path(str(args.manifest)),
+        out_jsonl=Path(str(args.out)),
+        cfg=dict(cfg),
+        split=str(args.split),
+        budgets=[int(b) for b in (args.budgets or [])],
+        max_cases=int(args.max_cases),
+        seed=int(args.seed),
+        policy_ckpt=str(args.policy_ckpt),
+        case_id_suffix=str(args.case_id_suffix),
+    )
     print(json.dumps(summary, ensure_ascii=False))
 
 

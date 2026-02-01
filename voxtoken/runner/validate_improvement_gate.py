@@ -44,6 +44,11 @@ def main() -> None:
     parser.add_argument("--metric", default="ground_mean_iou", help="Metric base name (default: ground_mean_iou)")
     parser.add_argument("--delta-ge", type=float, required=True, help="Require lhs_mean - rhs_mean >= delta_ge")
     parser.add_argument(
+        "--require-ci-nonoverlap",
+        action="store_true",
+        help="Also require lhs_ci_low >= rhs_ci_high (non-overlapping 95% CI in table).",
+    )
+    parser.add_argument(
         "--also-pass-if-ci-nonoverlap",
         action="store_true",
         help="Also pass if lhs_ci_low >= rhs_ci_high (non-overlapping 95% CI in table).",
@@ -84,12 +89,24 @@ def main() -> None:
     thr = float(args.delta_ge)
     ci_nonoverlap = bool(float(lhs_lo) >= float(rhs_hi))
 
-    passed = bool(delta >= thr) or (bool(args.also_pass_if_ci_nonoverlap) and bool(ci_nonoverlap))
-    if not passed:
+    passed_by_delta = bool(delta >= thr)
+    passed_by_ci = bool(ci_nonoverlap)
+    passed = bool(passed_by_delta) or (bool(args.also_pass_if_ci_nonoverlap) and bool(passed_by_ci))
+    if bool(args.require_ci_nonoverlap):
+        passed = bool(passed) and bool(passed_by_ci)
+    if not bool(passed):
+        reasons: list[str] = []
+        if not bool(passed_by_delta) and not (bool(args.also_pass_if_ci_nonoverlap) and bool(passed_by_ci)):
+            reasons.append(f"delta {delta:.6f} < {thr:.6f}")
+        if bool(args.require_ci_nonoverlap) and not bool(passed_by_ci):
+            reasons.append(f"ci_nonoverlap false (lhs_ci_low {lhs_lo:.6f} < rhs_ci_high {rhs_hi:.6f})")
+        if not reasons:
+            reasons.append("unspecified failure (check flags)")
         print(
             "[ERR] improvement gate failed: "
             f"budget_B={budget_B} metric={metric} lhs={args.lhs} rhs={args.rhs} "
-            f"delta={delta:.6f} (< {thr:.6f}), lhs_ci_low={lhs_lo:.6f}, rhs_ci_high={rhs_hi:.6f}",
+            f"delta={delta:.6f} (thr {thr:.6f}), ci_nonoverlap={ci_nonoverlap}, "
+            f"lhs_ci_low={lhs_lo:.6f}, rhs_ci_high={rhs_hi:.6f} :: " + "; ".join(reasons),
             file=sys.stderr,
         )
         sys.exit(1)
@@ -103,4 +120,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

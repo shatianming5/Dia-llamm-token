@@ -88,6 +88,12 @@ class TokenFeatures:
     center_z_mm: float = 0.0
     mean_intensity: float = 0.0
     max_intensity: float = 0.0
+    box_dx_mm: float = 0.0
+    box_dy_mm: float = 0.0
+    box_dz_mm: float = 0.0
+    box_volume_mm3: float = 0.0
+    step_idx: int = 0
+    budget_B: int = 0
 
 
 __all__ = [

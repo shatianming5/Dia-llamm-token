@@ -1,0 +1,38 @@
+[
+  {
+    "id": "E0975",
+    "stage": "smoke",
+    "name": "policy: train oracle-imitation list_soft_ce+zscore torch policy (box geom + context; smoke seed0) (smoke)",
+    "command": "python -m voxtoken.runner.validate_policy_dataset_jsonl --in artifacts/radgenome_policy_dataset_oracle_lung_nodule_full_eligible_e0964_smoke/dataset.jsonl --require-rows-ge 500 --require-cases-ge 20 --require-label --require-budgets 16,32 --require-step-idx --require-exactly-one-positive-per-step --require-keys center_x_mm,center_y_mm,center_z_mm,mean_intensity,max_intensity,level,box_dx_mm,box_dy_mm,box_dz_mm,box_volume_mm3,step_idx,budget_B && torchrun --standalone --nproc_per_node 1 -m voxtoken.runner.train_policy_torch --config voxtoken/configs/train_policy_radgenome_lung_nodule_oracle_torch_e0975_smoke_seed0.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E0975_smoke_seed0/checkpoint.json --require-nondefault-weights",
+    "workdir": "."
+  },
+  {
+    "id": "E0976",
+    "stage": "smoke",
+    "name": "eval: benchmark list_soft_ce+zscore box-geom+context policy (RadGenome lung nodule; val=100; smoke seed0) (smoke)",
+    "command": "python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_e0941/manifest.jsonl --out artifacts/e0976_benchmark_radgenome_lung_nodule_val100_smoke_seed0 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 20 --split val --seed 0 --policy-ckpt outputs/train_policy/E0975_smoke_seed0/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0976_benchmark_radgenome_lung_nodule_val100_smoke_seed0/summary.json --require-methods fixed heuristic learned random oracle",
+    "workdir": "."
+  },
+  {
+    "id": "E0977",
+    "stage": "smoke",
+    "name": "paper: export CI tables/plots (list_soft_ce+zscore box-geom+context policy; val=100; smoke) (smoke)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0976_benchmark_radgenome_lung_nodule_val100_smoke_seed0/metrics.jsonl --out artifacts/paper_e0977_radgenome_lung_nodule_listsoftce_zscore_boxgeom_ctx_policy_val100_smoke && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0977_radgenome_lung_nodule_listsoftce_zscore_boxgeom_ctx_policy_val100_smoke",
+    "workdir": "."
+  },
+  {
+    "id": "E0978",
+    "stage": "smoke",
+    "name": "eval: benchmark list_soft_ce+zscore box-geom+context policy (RadGenome lung nodule; full-eligible val=126; smoke seed0) (smoke)",
+    "command": "python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_full_eligible_e0949_smoke/manifest.jsonl --out artifacts/e0978_benchmark_radgenome_lung_nodule_full_eligible_smoke_seed0 --config voxtoken/configs/ct_rate_ts_grounding_e0907.yaml --budgets 8 16 32 --max-cases 20 --split val --seed 0 --policy-ckpt outputs/train_policy/E0975_smoke_seed0/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e0978_benchmark_radgenome_lung_nodule_full_eligible_smoke_seed0/summary.json --require-methods fixed heuristic learned random oracle",
+    "workdir": "."
+  },
+  {
+    "id": "E0979",
+    "stage": "smoke",
+    "name": "paper: export CI tables/plots (list_soft_ce+zscore box-geom+context policy; full-eligible; smoke) (smoke)",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e0978_benchmark_radgenome_lung_nodule_full_eligible_smoke_seed0/metrics.jsonl --out artifacts/paper_e0979_radgenome_lung_nodule_listsoftce_zscore_boxgeom_ctx_policy_full_eligible_smoke && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e0979_radgenome_lung_nodule_listsoftce_zscore_boxgeom_ctx_policy_full_eligible_smoke",
+    "workdir": "."
+  }
+]
+

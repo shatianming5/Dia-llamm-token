@@ -1,0 +1,38 @@
+[
+  {
+    "id": "E1009",
+    "stage": "smoke",
+    "name": "policy-data: oracle dataset (hi32 seq3)",
+    "workdir": ".",
+    "command": "python -m voxtoken.runner.build_policy_dataset_oracle --manifest artifacts/radgenome_gt_lung_nodule_full_eligible_hi32_e0986_smoke/manifest.jsonl --out artifacts/radgenome_policy_dataset_oracle_lung_nodule_full_eligible_hi32_seq3_e1009_smoke/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e1010.yaml --split train --budgets 16 32 --max-cases 50 --seed 0 && python -m voxtoken.runner.validate_policy_dataset_jsonl --in artifacts/radgenome_policy_dataset_oracle_lung_nodule_full_eligible_hi32_seq3_e1009_smoke/dataset.jsonl --require-rows-ge 500 --require-cases-ge 20 --require-label --require-budgets 16,32 --require-step-idx --require-exactly-one-positive-per-step --require-keys center_x_mm,center_y_mm,center_z_mm,mean_intensity,max_intensity,level,box_dx_mm,box_dy_mm,box_dz_mm,box_volume_mm3,step_idx,budget_B"
+  },
+  {
+    "id": "E1010",
+    "stage": "smoke",
+    "name": "policy-data: dagger dataset (hi32 seq3)",
+    "workdir": ".",
+    "command": "python -m voxtoken.runner.build_policy_dataset_dagger --manifest artifacts/radgenome_gt_lung_nodule_full_eligible_hi32_e0986_smoke/manifest.jsonl --out artifacts/radgenome_policy_dataset_dagger_lung_nodule_full_eligible_hi32_seq3_e1010_smoke/dataset.jsonl --config voxtoken/configs/ct_rate_ts_grounding_e1010.yaml --policy-ckpt outputs/train_policy/E0988_smoke_seed0/checkpoint.json --split train --budgets 16 32 --max-cases 50 --seed 0 --case-id-suffix __dagger_seq3 && python -m voxtoken.runner.validate_policy_dataset_jsonl --in artifacts/radgenome_policy_dataset_dagger_lung_nodule_full_eligible_hi32_seq3_e1010_smoke/dataset.jsonl --require-rows-ge 500 --require-cases-ge 20 --require-label --require-budgets 16,32 --require-step-idx --require-exactly-one-positive-per-step --require-keys center_x_mm,center_y_mm,center_z_mm,mean_intensity,max_intensity,level,box_dx_mm,box_dy_mm,box_dz_mm,box_volume_mm3,step_idx,budget_B"
+  },
+  {
+    "id": "E1011",
+    "stage": "smoke",
+    "name": "policy: train torch (hi32 seq3; seed0)",
+    "workdir": ".",
+    "command": "mkdir -p artifacts/radgenome_policy_dataset_oracle+dagger_lung_nodule_full_eligible_hi32_seq3_e1011_smoke && cat artifacts/radgenome_policy_dataset_oracle_lung_nodule_full_eligible_hi32_seq3_e1009_smoke/dataset.jsonl artifacts/radgenome_policy_dataset_dagger_lung_nodule_full_eligible_hi32_seq3_e1010_smoke/dataset.jsonl > artifacts/radgenome_policy_dataset_oracle+dagger_lung_nodule_full_eligible_hi32_seq3_e1011_smoke/dataset.jsonl && python -m voxtoken.runner.validate_policy_dataset_jsonl --in artifacts/radgenome_policy_dataset_oracle+dagger_lung_nodule_full_eligible_hi32_seq3_e1011_smoke/dataset.jsonl --require-rows-ge 1000 --require-cases-ge 20 --require-label --require-budgets 16,32 --require-step-idx --require-exactly-one-positive-per-step --require-keys center_x_mm,center_y_mm,center_z_mm,mean_intensity,max_intensity,level,box_dx_mm,box_dy_mm,box_dz_mm,box_volume_mm3,step_idx,budget_B && torchrun --standalone --nproc_per_node 1 -m voxtoken.runner.train_policy_torch --config voxtoken/configs/train_policy_radgenome_lung_nodule_oracle_torch_hi32_seq3_dagger_e1011_smoke_seed0.yaml && python -m voxtoken.runner.validate_policy_checkpoint --in outputs/train_policy/E1011_smoke_seed0/checkpoint.json --require-nondefault-weights"
+  },
+  {
+    "id": "E1012",
+    "stage": "smoke",
+    "name": "eval: benchmark (hi32 seq3; val=20)",
+    "workdir": ".",
+    "command": "python -m voxtoken.runner.ct_rate_grounding_benchmark --manifest artifacts/radgenome_gt_lung_nodule_full_eligible_hi32_e0986_smoke/manifest.jsonl --out artifacts/e1012_benchmark_radgenome_lung_nodule_hi32_seq3_full_eligible_smoke_seed0 --config voxtoken/configs/ct_rate_ts_grounding_e1010.yaml --budgets 8 16 32 --max-cases 20 --split val --seed 0 --policy-ckpt outputs/train_policy/E1011_smoke_seed0/checkpoint.json && python -m voxtoken.runner.validate_grounding_benchmark --in artifacts/e1012_benchmark_radgenome_lung_nodule_hi32_seq3_full_eligible_smoke_seed0/summary.json --require-methods fixed heuristic learned random oracle"
+  },
+  {
+    "id": "E1013",
+    "stage": "smoke",
+    "name": "paper: export (hi32 seq3; smoke)",
+    "workdir": ".",
+    "command": "python -m voxtoken.runner.paper_export --in artifacts/e1012_benchmark_radgenome_lung_nodule_hi32_seq3_full_eligible_smoke_seed0/metrics.jsonl --out artifacts/paper_e1013_radgenome_lung_nodule_hi32_seq3_listwise_ce_zscore_mlp_dagger_policy_full_eligible_smoke && python -m voxtoken.runner.validate_paper_artifacts --dir artifacts/paper_e1013_radgenome_lung_nodule_hi32_seq3_listwise_ce_zscore_mlp_dagger_policy_full_eligible_smoke"
+  }
+]
+

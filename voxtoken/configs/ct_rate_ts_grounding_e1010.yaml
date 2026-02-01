@@ -1,0 +1,29 @@
+# CT-RATE TS grounding benchmark config (hi32 token space; sequential multi-step refinement) (E1010+)
+#
+# Motivation:
+# - E1005 (seq2) enabled parent->child refinement but under-used the B=32 budget (tokens_used≈22).
+# - This config keeps sequential refinement (1 split per round), but allows more rounds so B=32 can
+#   reach 29 tokens (3 executed splits) while still permitting a depth-2 chain (L0->L1->L2).
+
+volume:
+  target_shape_cdhw: [1, 32, 32, 32]
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 16
+    max_levels: 3
+
+refine:
+  # Sequential refinement: one split per round, multiple rounds.
+  max_rounds: 4
+  max_splits_per_round: 1
+
+policy:
+  mode: heuristic
+  weights:
+    recon_error: 1.0
+    evidence_entropy: 1.0
+    citation_pressure: 0.0
+    history_splits: -1.0
+

@@ -1,0 +1,31 @@
+# CT-RATE TS grounding benchmark config (hi32 token space; sequential 2-step refinement) (E1005+)
+#
+# Motivation:
+# - The hi32 token space (32^3, patch=16) improves token-level patch statistics.
+# - The original benchmark (E0985) splits up to 3 coarse Level-0 tokens in one round at B=32,
+#   which prevents "parent -> child" refinement chains.
+# - This config forces sequential refinement: split 1 token per round, for 2 rounds.
+#   It enables a depth-2 chain (Level-0 -> Level-1 -> Level-2) while staying within budget.
+
+volume:
+  target_shape_cdhw: [1, 32, 32, 32]
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 16
+    max_levels: 3
+
+refine:
+  # Sequential refinement: one split per round.
+  max_rounds: 2
+  max_splits_per_round: 1
+
+policy:
+  mode: heuristic
+  weights:
+    recon_error: 1.0
+    evidence_entropy: 1.0
+    citation_pressure: 0.0
+    history_splits: -1.0
+
