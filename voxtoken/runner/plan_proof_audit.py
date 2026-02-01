@@ -200,7 +200,7 @@ def _claim_status(
     results: Dict[str, List[ResultHit]],
 ) -> Tuple[bool, List[str]]:
     if not claim.checked:
-        return True, ["pending (unchecked in docs/plan.md)"]
+        return True, []
 
     reasons: List[str] = []
     if not claim.evidence:
@@ -242,10 +242,17 @@ def _write_audit_md(
     rows: List[Tuple[str, str, str, str, str, str]] = []
     unproved: List[Tuple[Claim, List[str]]] = []
 
+    checked_total = 0
+    checked_proved = 0
+
     for claim in claims:
         ok, reasons = _claim_status(claim, ledger=ledger, results=results)
         if claim.checked and not ok:
             unproved.append((claim, reasons))
+        if claim.checked:
+            checked_total += 1
+            if ok:
+                checked_proved += 1
 
         evid = ", ".join(claim.evidence) if claim.evidence else "-"
 
@@ -271,7 +278,8 @@ def _write_audit_md(
         )
 
     total = len(claims)
-    proved = total - len(unproved)
+    pending = total - int(checked_total)
+    not_proved = int(checked_total) - int(checked_proved)
 
     lines: List[str] = []
     lines.append("# Proof Audit\n")
@@ -284,8 +292,10 @@ def _write_audit_md(
 
     lines.append("\n## Summary\n")
     lines.append(f"- total_claims: **{total}**\n")
-    lines.append(f"- proved: **{proved}**\n")
-    lines.append(f"- not_proved: **{len(unproved)}**\n")
+    lines.append(f"- checked_claims: **{checked_total}**\n")
+    lines.append(f"- proved_checked: **{checked_proved}**\n")
+    lines.append(f"- not_proved_checked: **{not_proved}**\n")
+    lines.append(f"- pending_claims: **{pending}**\n")
 
     lines.append("\n## Claims\n")
     lines.append("| Claim | Text | Evidence | Ledger smoke/full | Results smoke/full | Status |\n")

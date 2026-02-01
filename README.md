@@ -180,6 +180,17 @@ paper-track（RadGenome lung nodule）关键产物：
 - **Sequential refine + reward-stop-threshold (hi32 seq3; E1044)**：budget_B=32 learned mean IoU=0.1232（CI≈[0.1070, 0.1404]），random=0.0980（≈[0.0853, 0.1110]），Δ=+0.0253；paired Δ CI≈[0.0142, 0.0362]（显著 > 0）
 - 备注：单独看 “learned/random 各自的 CI 是否重叠” 并不能判断差异是否显著；这里用的是 **paired bootstrap over per-case deltas**（见 `voxtoken/runner/validate_paired_delta_ci.py`）
 
+paper-track（CT-RATE pleural_effusion）关键产物：
+
+- `artifacts/ct_rate_effusion_gt_pleural_hi32_e1045/manifest.jsonl`：GT-box manifest（train=21/val=15）
+- `artifacts/ct_rate_policy_dataset_oracle_pleural_hi32_stop_e1047/dataset.jsonl`：oracle+STOP policy dataset
+- `outputs/train_policy/E1048_seed{0,1,2}/checkpoint.json` + `model.pt`：learned split policy（torch）
+- `artifacts/paper_e1050_ct_rate_pleural_hi32_stopthr/table1_main_ci.csv`：主表（multi-seed bootstrap CI）
+
+参考结果（CT-RATE pleural_effusion，val n=15；最新 full run 于 2026-02-01 产出）：
+
+- **Reward-stop-threshold (hi32; E1050)**：budget_B=32 learned mean IoU=0.1113（CI≈[0.0593, 0.1674]），random=0.0900（≈[0.0521, 0.1318]），Δ=+0.0213；paired Δ CI≈[0.0006, 0.0425]（显著 > 0）
+
 ### 4.4 split 与 seed（对齐 plan）
 
 - patient-level split（避免同一病人泄漏到 train/test）

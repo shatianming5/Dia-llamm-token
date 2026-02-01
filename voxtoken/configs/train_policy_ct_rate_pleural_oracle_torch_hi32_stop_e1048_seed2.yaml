@@ -1,0 +1,27 @@
+# Train policy config (torch/DDP) (CT-RATE pleural_effusion; oracle+STOP; hi32) (E1048 seed2)
+
+run_id: E1048_seed2
+out_dir: outputs/train_policy
+
+dataset_jsonl: artifacts/ct_rate_policy_dataset_oracle_pleural_hi32_stop_e1047/dataset.jsonl
+
+seed: 2
+
+ddp:
+  backend: nccl
+  fp16: false
+
+train:
+  epochs: 200
+  batch_size: 256
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  ridge: 1.0e-6
+  loss: mse
+  feature_norm: zscore
+  feature_norm_eps: 1.0e-6
+
+model:
+  input_dim: 16
+  hidden_dims: [256, 256]
+  activation: relu

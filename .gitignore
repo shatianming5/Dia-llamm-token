@@ -14,6 +14,7 @@ runs/
 .rd_queue/logs/
 .rd_queue/results/
 .rd_queue/queue.json
+.rd_queue/queue_*.json
 .rd_queue/queue_rerun_*.json
 
 .DS_Store

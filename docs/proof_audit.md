@@ -1,5 +1,5 @@
 # Proof Audit
-Generated at (UTC): `2026-02-01T19:29:19.671532+00:00`
+Generated at (UTC): `2026-02-01T20:21:33.538679+00:00`
 
 ## Inputs
 - plan: `docs/plan.md`
@@ -7,9 +7,11 @@ Generated at (UTC): `2026-02-01T19:29:19.671532+00:00`
 - results_dir: `.rd_queue/results`
 
 ## Summary
-- total_claims: **53**
-- proved: **53**
-- not_proved: **0**
+- total_claims: **58**
+- checked_claims: **58**
+- proved_checked: **58**
+- not_proved_checked: **0**
+- pending_claims: **0**
 
 ## Claims
 | Claim | Text | Evidence | Ledger smoke/full | Results smoke/full | Status |
@@ -67,6 +69,11 @@ Generated at (UTC): `2026-02-01T19:29:19.671532+00:00`
 | C0108 | Papertrack (GT): Torch reward-policy training (STOP action; reward regression) writes reusable checkpoints with `model.pt` and non-default weights (multi-seed). | E1042 | Y/Y | Y/Y | PROVED |
 | C0109 | Papertrack (GT): RadGenome lung nodule grounding benchmark (reward stop-threshold) runs fixed/heuristic/learned/random/oracle across budgets and emits deterministic summaries (multi-seed). | E1043 | Y/Y | Y/Y | PROVED |
 | C0110 | Papertrack (GT): Learned policy achieves a statistically significant improvement over random at budget 32 on RadGenome lung nodule grounding (ΔIoU >= 0.017 and paired Δ CI_low >= 0). | E1044 | Y/Y | Y/Y | PROVED |
+| C0111 | Papertrack (GT): CT-RATE pleural_effusion GT manifest (hi32 token-space) can be built from real CT volumes + TotalSeg masks with non-empty GT boxes and deterministic splits. | E1045 | Y/Y | Y/Y | PROVED |
+| C0112 | Papertrack (GT): Oracle+STOP policy dataset for CT-RATE pleural_effusion can be built from GT boxes into a runnable dataset.jsonl. | E1047 | Y/Y | Y/Y | PROVED |
+| C0113 | Papertrack (GT): Torch reward-policy training (reward regression; weight_decay=1e-4) writes reusable checkpoints with `model.pt` and non-default weights (multi-seed) for CT-RATE pleural_effusion. | E1048 | Y/Y | Y/Y | PROVED |
+| C0114 | Papertrack (GT): CT-RATE pleural_effusion grounding benchmark (reward stop-threshold; hi32) runs fixed/heuristic/learned/random/oracle across budgets and emits deterministic summaries (multi-seed). | E1049 | Y/Y | Y/Y | PROVED |
+| C0115 | Papertrack (GT): Learned policy achieves a statistically significant improvement over random at budget 32 on CT-RATE pleural_effusion grounding (ΔIoU >= 0.017 and paired Δ CI_low >= 0). | E1050 | Y/Y | Y/Y | PROVED |
 
 ## Not Proved
 

@@ -1,0 +1,30 @@
+# CT-RATE TS grounding config (effusions; hi32 token space) (E1045+)
+#
+# This config mirrors `ct_rate_ts_grounding_e0985.yaml` (hi32 token-space) but
+# adds explicit-mask GT sources for pleural/pericardial effusions that are
+# available on this machine under `/data/totalseg_outputs/...`.
+
+volume:
+  target_shape_cdhw: [1, 32, 32, 32]
+
+tokenizer:
+  voxel_spacing_mm: [1.0, 1.0, 1.0]
+  grid:
+    patch: 16
+    max_levels: 3
+
+refine:
+  max_rounds: 2
+  max_splits_per_round: 4
+
+policy:
+  mode: heuristic
+  weights:
+    recon_error: 1.0
+    evidence_entropy: 1.0
+    citation_pressure: 0.0
+    history_splits: -1.0
+
+effusions:
+  candidates_csv: /data/totalseg_outputs/ct_rate_valid_pleural_pericard_effusion_run1/candidates_effusions/pleural_pericard_effusion_candidates.csv
+  masks_root: /data/totalseg_outputs/ct_rate_valid_pleural_pericard_effusion_run1

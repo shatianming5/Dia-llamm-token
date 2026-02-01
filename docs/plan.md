@@ -194,6 +194,22 @@
   - Evidence: E1044
   - Proof rule: Run E1044; `validate_improvement_gate` and `validate_paired_delta_ci` pass with the specified thresholds at `budget=32` for `metric=ground_mean_iou`.
 
+- [x] C0111: Papertrack (GT): CT-RATE pleural_effusion GT manifest (hi32 token-space) can be built from real CT volumes + TotalSeg masks with non-empty GT boxes and deterministic splits.
+  - Evidence: E1045
+  - Proof rule: Run E1045; every row has existing `gt_mask_path`, `coord_system=token_space_mm`, and non-empty GT boxes; split counts are non-empty.
+- [x] C0112: Papertrack (GT): Oracle+STOP policy dataset for CT-RATE pleural_effusion can be built from GT boxes into a runnable dataset.jsonl.
+  - Evidence: E1047
+  - Proof rule: Run E1047; `validate_policy_dataset_jsonl` passes with required keys, budgets, and listwise invariants.
+- [x] C0113: Papertrack (GT): Torch reward-policy training (reward regression; weight_decay=1e-4) writes reusable checkpoints with `model.pt` and non-default weights (multi-seed) for CT-RATE pleural_effusion.
+  - Evidence: E1048
+  - Proof rule: Run E1048; `validate_policy_checkpoint` passes for seeds 0/1/2 and checkpoints include `model.pt`.
+- [x] C0114: Papertrack (GT): CT-RATE pleural_effusion grounding benchmark (reward stop-threshold; hi32) runs fixed/heuristic/learned/random/oracle across budgets and emits deterministic summaries (multi-seed).
+  - Evidence: E1049
+  - Proof rule: Run E1049; `validate_grounding_benchmark` passes per seed and required methods exist.
+- [x] C0115: Papertrack (GT): Learned policy achieves a statistically significant improvement over random at budget 32 on CT-RATE pleural_effusion grounding (ΔIoU >= 0.017 and paired Δ CI_low >= 0).
+  - Evidence: E1050
+  - Proof rule: Run E1050; `validate_improvement_gate` and `validate_paired_delta_ci` pass with the specified thresholds at `budget=32` for `metric=ground_mean_iou`.
+
 ## Plan Items (P####)
 
 - [x] P0001: Provide a baseline smoke entrypoint that emits `run.json`/`summary.json` with stable schema.
@@ -409,9 +425,35 @@
   - Verification: `python -m voxtoken.runner.reproduce --exp E1044`
   - Touchpoints: `voxtoken/runner/paper_export.py`, `voxtoken/runner/validate_improvement_gate.py`, `voxtoken/runner/validate_paired_delta_ci.py`
 
+- [x] P0043: Add a CT-RATE pleural_effusion GT manifest builder (hi32 token-space) and its runnable experiment.
+  - Linked claims: C0111
+  - Definition of done: `ct_rate_ts_manifest` can build a `manifest.jsonl` with existing `gt_mask_path`, non-empty `grounding_boxes_by_sent_mm`, deterministic splits, and `coord_system=token_space_mm`.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E1045`
+  - Touchpoints: `voxtoken/data/ct_rate_ts_manifest.py`, `voxtoken/configs/ct_rate_ts_grounding_effusion_hi32_e1045.yaml`
+- [x] P0044: Add oracle+STOP policy dataset builder for CT-RATE pleural_effusion and its runnable experiment.
+  - Linked claims: C0112
+  - Definition of done: `build_policy_dataset_oracle --include-stop` produces `dataset.jsonl` that validates listwise invariants and required feature keys.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E1047`
+  - Touchpoints: `voxtoken/runner/build_policy_dataset_oracle.py`, `voxtoken/runner/validate_policy_dataset_jsonl.py`
+- [x] P0045: Add Torch reward-policy training configs for CT-RATE pleural_effusion (reward regression; weight_decay=1e-4; multi-seed) and its runnable experiment.
+  - Linked claims: C0113
+  - Definition of done: `train_policy_torch` writes `checkpoint.json` + `model.pt` and checkpoint validation passes for seeds 0/1/2.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E1048`
+  - Touchpoints: `voxtoken/runner/train_policy_torch.py`, `voxtoken/models/policy.py`, `voxtoken/models/policy_mlp.py`, `voxtoken/runner/validate_policy_checkpoint.py`, `voxtoken/configs/train_policy_ct_rate_pleural_oracle_torch_hi32_stop_e1048_seed*.yaml`
+- [x] P0046: Add reward stop-threshold benchmarking for CT-RATE pleural_effusion with strong baselines (random/oracle) and multi-seed aggregation.
+  - Linked claims: C0114
+  - Definition of done: Benchmark runner supports methods `fixed,heuristic,learned,random,oracle`, budgets `8/16/32`, and `--seed`; outputs validate deterministically.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E1049`
+  - Touchpoints: `voxtoken/runner/ct_rate_grounding_benchmark.py`, `voxtoken/runner/validate_grounding_benchmark.py`, `voxtoken/configs/ct_rate_ts_grounding_e1039_reward_stopthr.yaml`
+- [x] P0047: Add paper export gates for statistically significant learned-vs-random improvement at budget 32 for CT-RATE pleural_effusion (paired-delta CI).
+  - Linked claims: C0115
+  - Definition of done: Paper export aggregates multi-seed metrics into CI tables/plots and validators gate `ΔIoU@B32>=0.017` and `paired Δ CI_low>=0`.
+  - Verification: `python -m voxtoken.runner.reproduce --exp E1050`
+  - Touchpoints: `voxtoken/runner/paper_export.py`, `voxtoken/runner/validate_improvement_gate.py`, `voxtoken/runner/validate_paired_delta_ci.py`
+
 ## Next Steps (Paper-grade Roadmap)
 
-The repo is still “interfaces-first”, but the papertrack grounding loop is now end-to-end and gated (C0110/E1044). To continue toward paper-grade coverage:
+The repo is still “interfaces-first”, but the papertrack grounding loop is now end-to-end and gated (C0110/E1044; C0115/E1050). To continue toward paper-grade coverage:
 
 1) Multi-task grounding (real masks): replicate the C0110-style paired-Δ gate on at least 2–3 additional mask-defined findings (e.g., pleural effusion, pericardial effusion, pneumothorax) using the existing GT-manifest builders (`ct_rate_ts_manifest`, `radgenome_mask_manifest`) and the reward-policy training/benchmark stack (`train_policy_torch`, `ct_rate_grounding_benchmark`, `paper_export`).
 2) Stronger baselines: add at least one non-trivial baseline beyond `random/heuristic` (e.g., fixed ROI crop or uniform-depth refinement) inside `ct_rate_grounding_benchmark`, then extend `paper_export` tables to include it.
@@ -420,6 +462,8 @@ The repo is still “interfaces-first”, but the papertrack grounding loop is n
 
 ## Changelog
 
+- 2026-02-01: Implemented + proved E1045/E1047–E1050 (CT-RATE pleural_effusion GT papertrack; passes paired-Δ gate at B32).
+- 2026-02-01: Add CT-RATE pleural_effusion papertrack pipeline as runnable commitments (`C0111–C0115` / `P0043–P0047`) and define experiments E1045/E1047–E1050.
 - 2026-02-01: Add papertrack RadGenome lung nodule GT (hi32 full-eligible) reward-policy pipeline and pass the paired-Δ significance gate at B32 (E0986, E1042–E1044).
 - 2026-01-31: Promote “paper-grade” CT-RATE TS grounding benchmark into runnable commitments (`C0036–C0039` / `P0035–P0038`) and add experiments E0907–E0910.
 - 2026-01-31: Implemented + proved E0907–E0910 (CT-RATE TS GT manifest, policy dataset+training, grounding benchmark, and paper export).
